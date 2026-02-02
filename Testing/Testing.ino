@@ -1,4 +1,4 @@
-#define enA_A 2 //PWM Out Motor A
+#define enA_A 6 //PWM Out Motor A
 #define in1_A 3 //Enable 1 Motor A
 #define in2_A 4 //Enable 2 Motor A
 
@@ -12,14 +12,14 @@ void setup() {
 }
 
 void loop() {
-  int pwmOutput = 50;
-  analogWrite(enA_A, pwmOutput); // Send PWM signal to L298N Enable pin
+  int pwmOutput = .5;
+  analogWrite(enA_A, 255 * pwmOutput); // Send PWM signal to L298N Enable pin
 
   digitalWrite(in1_A, HIGH);
   digitalWrite(in2_A, LOW);
   delay(20);
-
-  digitalWrite(in1_A, LOW);
-  digitalWrite(in2_A, HIGH);
-  delay(20);
+  
+  //digitalWrite(in1_A, LOW);
+  //digitalWrite(in2_A, HIGH);
+  //delay(20); 
 }
