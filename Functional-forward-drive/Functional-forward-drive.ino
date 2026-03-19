@@ -20,6 +20,24 @@
 #define in2_F 20 // Enable 2 Motor F
 #define PWM_F 45 // PWM Out Motor F
 
+// Encoders (SKIP PIN 10)
+#define whA_B 13 // Wheel A output B
+#define whA_A 12 // Wheel A output A
+#define whB_B 11 // Wheel B output B
+#define whB_A 9 // wheel B output A
+#define whC_B 8 // Wheel C output B
+#define whC_A 7 // wheel C output A
+#define whD_B 6 // wheel D output B
+#define whD_A 5 // wheel D output A
+#define whE_B 4 // wheel E output B
+#define whE_A 3 // wheel E output A
+#define whF_B 2 // wheel F output B
+#define whF_A 1 // wheel F output A
+
+//IMU
+#define tx 14 
+#define rx 15
+
 #define MASTER_CLOCK 84000000
 
 
