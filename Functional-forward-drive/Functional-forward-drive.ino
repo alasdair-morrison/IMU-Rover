@@ -1,23 +1,23 @@
 //Front Wheels
 #define PWM_A 35 //PWM Out Motor A
-#define in1_A 28 //Enable 1 Motor A
-#define in2_A 29 //Enable 2 Motor A
-#define in1_B 30 // Enable 1 Motor B
-#define in2_B 31 // Enable 2 Motor B
+#define in1_A 30 //Enable 1 Motor A
+#define in2_A 31 //Enable 2 Motor A
+#define in1_B 32 // Enable 1 Motor B
+#define in2_B 33 // Enable 2 Motor B
 #define PWM_B 37 // PWM Out Motor B
 //Middle Wheels
 #define PWM_C 39 // PWM Out Motor C
-#define in1_C 24 //Enable 1 Motor C
-#define in2_C 25 // Enable 2 Motor C
-#define in1_D 26 // Enable 1 Motor D
-#define in2_D 27 // Enable 2 Motor D
+#define in1_C 26 //Enable 1 Motor C
+#define in2_C 27 // Enable 2 Motor C
+#define in1_D 28 // Enable 1 Motor D
+#define in2_D 29 // Enable 2 Motor D
 #define PWM_D 41 // PWM Out Motor D
 //Rear Wheels
 #define PWM_E 44 // PWM Out Motor E
-#define in1_E 23 // Enable 1 Motor E
-#define in2_E 22 // Enable 2 Motor E
-#define in1_F 21 // Enable 1 Motor F
-#define in2_F 20 // Enable 2 Motor F
+#define in1_E 25 // Enable 1 Motor E
+#define in2_E 24 // Enable 2 Motor E
+#define in1_F 23 // Enable 1 Motor F
+#define in2_F 22 // Enable 2 Motor F
 #define PWM_F 45 // PWM Out Motor F
 
 // Encoders (SKIP PIN 10)

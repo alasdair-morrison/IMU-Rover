@@ -1,3 +1,7 @@
+#include "SD.h"
+#include <Wire.h>
+#include "RTClib.h"
+
 //Front Wheels
 #define PWM_A 35 //PWM Out Motor A
 #define in1_A 28 //Enable 1 Motor A
@@ -48,28 +52,6 @@ int chD = 3;
 int chE = 5;
 int chF = 6;
 
-#define LOG_INTERVAL  1000 // mills between entries (1000 = 1 second)
-#define ECHO_TO_SERIAL   1 // echo data to serial port
-#define WAIT_TO_START    0 // Wait for serial input in setup()
-
-RTC_DS1307 RTC; // define the Real Time Clock object
-
-const int chipSelect = 10;
-
-// the logging file
-File logfile;
-
-void error(char *str)
-{
-  Serial.print("error: ");
-  Serial.println(str);
-  
-  // red LED indicates error
-  digitalWrite(redLEDpin, HIGH);
-  
-  while(1);
-}
-
 void SetPin(uint8_t pin)
 {
   PIO_Configure(g_APinDescription[pin].pPort,
@@ -97,7 +79,82 @@ void setPWM(int channel) {
   PWMC_EnableChannel(PWM, channel); // Channel: variable
 }
 
+#define LOG_INTERVAL  1000 // mills between entries (1000 = 1 second)
+#define ECHO_TO_SERIAL   1 // echo data to serial port
+#define WAIT_TO_START    0 // Wait for serial input in setup()
+
+RTC_DS1307 myRTC; // define the Real Time Clock object
+
+const int chipSelect = 10;
+
+// the logging file
+File logfile;
+
+void error(char *str)
+{
+  Serial.print("error: ");
+  Serial.println(str);
+  
+  while(1);
+}
+
 void setup() {
+  //Datalogger Setup
+    Serial.begin(9600);
+  Serial.println();
+  
+#if WAIT_TO_START
+  Serial.println("Type any character to start");
+  while (!Serial.available());
+#endif //WAIT_TO_START
+  // initialize the SD card
+  Serial.print("Initializing SD card...");
+  // make sure that the default chip select pin is set to
+  // output, even if you don't use it:
+  pinMode(10, OUTPUT);
+  
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    return;
+  }
+  Serial.println("card initialized.");
+  
+  // create a new file
+  char filename[] = "LOGGER00.CSV";
+  for (uint8_t i = 0; i < 100; i++) {
+    filename[6] = i/10 + '0';
+    filename[7] = i%10 + '0';
+    if (! SD.exists(filename)) {
+      // only open a new file if it doesn't exist
+      logfile = SD.open(filename, FILE_WRITE); 
+      break;  // leave the loop!
+    }
+  }
+  
+  if (! logfile) {
+    error("couldnt create file");
+  }
+  
+  Serial.print("Logging to: ");
+  Serial.println(filename);
+    Wire.begin();  
+  if (!myRTC.begin()) {
+    logfile.println("RTC failed");
+#if ECHO_TO_SERIAL
+    Serial.println("RTC failed");
+#endif  //ECHO_TO_SERIAL
+  }
+  
+
+  logfile.println("millis,time,light,temp");    
+#if ECHO_TO_SERIAL
+  Serial.println("millis,time,light,temp");
+#endif
+#if ECHO_TO_SERIAL// attempt to write out the header to the file
+  logfile.flush(); // This saves the data to the SD card
+#endif
   //Front Wheel Setup
   pinMode(in1_A, OUTPUT);
   pinMode(in2_A, OUTPUT);
@@ -159,14 +216,9 @@ void setup() {
   pinMode(whF_B, INPUT);
   pinMode(whF_A, INPUT);
 
-
 }
 
 void loop() {
-  int pwmOutput = 1;
-  //analogWrite(enA_A, 255 * pwmOutput); // Send PWM signal to L298N Enable pin
-  //analogWrite(34,64);
-
   digitalWrite(in1_A, HIGH);
   digitalWrite(in2_A, LOW);
   digitalWrite(in1_B, HIGH);
