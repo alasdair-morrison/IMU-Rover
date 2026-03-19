@@ -1,6 +1,7 @@
 #include "SD.h"
 #include <Wire.h>
 #include "RTClib.h"
+#include "RTCDue.h"
 
 //Front Wheels
 #define PWM_A 35 //PWM Out Motor A
@@ -83,7 +84,7 @@ void setPWM(int channel) {
 #define ECHO_TO_SERIAL   1 // echo data to serial port
 #define WAIT_TO_START    0 // Wait for serial input in setup()
 
-RTC_DS1307 myRTC; // define the Real Time Clock object
+RTCDue rtc(XTAL);
 
 const int chipSelect = 10;
 
@@ -139,15 +140,15 @@ void setup() {
   
   Serial.print("Logging to: ");
   Serial.println(filename);
-    Wire.begin();  
-  if (!myRTC.begin()) {
-    logfile.println("RTC failed");
-#if ECHO_TO_SERIAL
-    Serial.println("RTC failed");
-#endif  //ECHO_TO_SERIAL
-  }
+  Wire.begin();  
+  rtc.begin();
+  rtc.setTime(0, 16, 15); // 15:16:00
+  rtc.setDate(19, 3, 2026); // 19th March 2026
   
-
+  logfile.println("RTC Initialized");
+#if ECHO_TO_SERIAL
+  Serial.println("RTC Initialized");
+#endif
   logfile.println("millis,time,light,temp");    
 #if ECHO_TO_SERIAL
   Serial.println("millis,time,light,temp");
