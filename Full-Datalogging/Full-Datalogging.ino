@@ -1,4 +1,5 @@
 #include "SD.h"
+#include <SPI.h>  // needed for SD card communication
 #include <Wire.h>
 #include "RTClib.h"
 #include "RTCDue.h"
@@ -110,9 +111,7 @@ void setPWM(int channel) {
 RTCDue rtc(XTAL);
 
 const int chipSelect = 10;
-
-// the logging file
-File logfile;
+File DataFile; // global file object so all functions can write to it
 
 void error(char *str)
 {

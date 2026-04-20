@@ -1,4 +1,5 @@
 #include "SD.h"
+#include <SPI.h>  // needed for SD card communication
 #include <Wire.h>
 #include "RTClib.h"
 #include "RTCDue.h"
