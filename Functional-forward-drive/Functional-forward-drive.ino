@@ -126,22 +126,22 @@ void setup() {
 }
 //***ALL DUTY CYCLES ARE INVERTED DUE TO AVAIALBLE PINS 0 = 100% & 1200 = 0%***
 void loop() {
-  PWMC_SetDutyCycle(PWM, chA, 0); // Channel: 0, Duty cycle: 100 %
-  PWMC_SetDutyCycle(PWM, chB, 0); // Channel: 1, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chA, 300); // Channel: 0, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chB, 300); // Channel: 1, Duty cycle: 100 %
   digitalWrite(in1_A, HIGH);
   digitalWrite(in2_A, LOW);
   digitalWrite(in1_B, HIGH);
   digitalWrite(in2_B, LOW);
 
-  PWMC_SetDutyCycle(PWM, chC, 0); // Channel: 2, Duty cycle: 100 %
-  PWMC_SetDutyCycle(PWM, chD, 0); // Channel: 3, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chC, 300); // Channel: 2, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chD, 300); // Channel: 3, Duty cycle: 100 %
   digitalWrite(in1_C, HIGH);
   digitalWrite(in2_C, LOW);
   digitalWrite(in1_D, HIGH);
   digitalWrite(in2_D, LOW);
 
-  PWMC_SetDutyCycle(PWM, chE, 0); // Channel: 5, Duty cycle: 100 %
-  PWMC_SetDutyCycle(PWM, chF, 0); // Channel: 6, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chE, 300); // Channel: 5, Duty cycle: 100 %
+  PWMC_SetDutyCycle(PWM, chF, 300); // Channel: 6, Duty cycle: 100 %
   digitalWrite(in1_E, HIGH);
   digitalWrite(in2_E, LOW);
   digitalWrite(in1_F, HIGH);
