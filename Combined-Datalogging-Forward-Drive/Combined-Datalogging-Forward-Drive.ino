@@ -1,10 +1,12 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <SD.h>
+#include <RTCDue.h>
 #include <Adafruit_HUSB238.h>
 
 Adafruit_HUSB238 husb238;
 File DataFile;
+RTCDue rtc(XTAL);
 
 // Motor driver pins
 #define PWM_A 35
@@ -21,12 +23,12 @@ File DataFile;
 #define in2_D 29
 #define PWM_D 41
 
-#define PWM_E 34
+#define PWM_E 44
 #define in1_E 25
 #define in2_E 24
 #define in1_F 23
 #define in2_F 22
-#define PWM_F 36
+#define PWM_F 45
 
 // Encoder pins
 #define Wheel_A_Channel_A 1
@@ -48,18 +50,18 @@ File DataFile;
 
 #define MASTER_CLOCK 84000000
 
-const int chipselect = 10;
+const int sdChipSelect = 10;
 const int ledPin = 13;
 const unsigned long interval = 10;
-const int drivePWM = 180;
+const int forwardDrivePwm = 180;
 
-uint32_t clock_a = 42000000;
-int chA = 0;
-int chB = 1;
-int chC = 2;
-int chD = 3;
-int chE = 5;
-int chF = 6;
+uint32_t pwmClockFrequencyHz = 42000000;
+int motorPwmChannelA = 0;
+int motorPwmChannelB = 1;
+int motorPwmChannelC = 2;
+int motorPwmChannelD = 3;
+int motorPwmChannelE = 5;
+int motorPwmChannelF = 6;
 
 volatile long counts[6] = {0, 0, 0, 0, 0, 0};
 int MotorPWM[6] = {0, 0, 0, 0, 0, 0};
@@ -72,6 +74,62 @@ float Roll = 0;
 float Pitch = 0;
 float Yaw = 0;
 float supplyVoltage = 9.0;
+bool serialHeaderSent = false;
+
+void InitializeRTC() {
+  rtc.begin();
+  rtc.setTime(16, 55, 16);
+  rtc.setDate(3, 7, 2026);
+}
+
+void FormatRTCTimestamp(char* buffer, size_t bufferSize) {
+  snprintf(buffer,
+           bufferSize,
+           "%04u-%02d-%02d %02d:%02d:%02d",
+           rtc.getYear(),
+           rtc.getMonth(),
+           rtc.getDay(),
+           rtc.getHours(),
+           rtc.getMinutes(),
+           rtc.getSeconds());
+}
+
+void PrintLogHeader(Print& output) {
+  output.println("RTC_Timestamp,Time_ms,Roll,Pitch,Yaw,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
+}
+
+void PrintLogRow(Print& output, const char* rtcTimestamp, unsigned long timeStamp, const long* encoderCounts) {
+  output.print(rtcTimestamp);
+  output.print(",");
+  output.print(timeStamp);
+  output.print(",");
+  output.print(Roll);
+  output.print(",");
+  output.print(Pitch);
+  output.print(",");
+  output.print(Yaw);
+  output.print(",");
+
+  for (int i = 0; i < 6; i++) {
+    output.print(encoderCounts[i]);
+    output.print(",");
+  }
+
+  for (int i = 0; i < 6; i++) {
+    output.print(MotorPWM[i]);
+    output.print(",");
+  }
+
+  for (int i = 0; i < 6; i++) {
+    float motorVoltage = (MotorPWM[i] / 255.0) * supplyVoltage;
+    output.print(motorVoltage);
+    if (i < 5) {
+      output.print(",");
+    }
+  }
+
+  output.println();
+}
 
 void SetPin(uint8_t pin)
 {
@@ -83,7 +141,7 @@ void SetPin(uint8_t pin)
 
 void setPWM(int channel) {
   pmc_enable_periph_clk(PWM_INTERFACE_ID);
-  PWMC_ConfigureClocks(clock_a, 0, MASTER_CLOCK);
+  PWMC_ConfigureClocks(pwmClockFrequencyHz, 0, MASTER_CLOCK);
   PWMC_ConfigureChannelExt(PWM,
                            channel,
                            PWM_CMR_CPRE_CLKA,
@@ -100,7 +158,7 @@ void setPWM(int channel) {
 }
 
 void ApplyMotorPWM() {
-  int pwmChannels[6] = {chA, chB, chC, chD, chE, chF};
+  int pwmChannels[6] = {motorPwmChannelA, motorPwmChannelB, motorPwmChannelC, motorPwmChannelD, motorPwmChannelE, motorPwmChannelF};
   for (int i = 0; i < 6; i++) {
     int duty = (int)map(MotorPWM[i], 0, 255, 0, 1200);
     PWMC_SetDutyCycle(PWM, pwmChannels[i], duty);
@@ -192,6 +250,9 @@ void EnsureMotorPower() {
 
 void LogData(unsigned long TimeStamp) {
   long Safe_Encoder_Counts[6];
+  char rtcTimestamp[32];
+  FormatRTCTimestamp(rtcTimestamp, sizeof(rtcTimestamp));
+
   noInterrupts();
   for (int i = 0; i < 6; i++) {
     Safe_Encoder_Counts[i] = counts[i];
@@ -200,35 +261,18 @@ void LogData(unsigned long TimeStamp) {
 
   if (DataFile) {
     digitalWrite(ledPin, HIGH);
-    DataFile.print(TimeStamp);
-    DataFile.print(",");
-    DataFile.print(Roll);
-    DataFile.print(",");
-    DataFile.print(Pitch);
-    DataFile.print(",");
-    DataFile.print(Yaw);
-    DataFile.print(",");
-
-    for (int i = 0; i < 6; i++) {
-      DataFile.print(Safe_Encoder_Counts[i]);
-      DataFile.print(",");
-    }
-
-    for (int i = 0; i < 6; i++) {
-      DataFile.print(MotorPWM[i]);
-      DataFile.print(",");
-    }
-
-    for (int i = 0; i < 6; i++) {
-      float motorVoltage = (MotorPWM[i] / 255.0) * supplyVoltage;
-      DataFile.print(motorVoltage);
-      if (i < 5) {
-        DataFile.print(",");
-      }
-    }
-
-    DataFile.println();
+    PrintLogRow(DataFile, rtcTimestamp, TimeStamp, Safe_Encoder_Counts);
     digitalWrite(ledPin, LOW);
+  }
+
+  if (Serial) {
+    if (!serialHeaderSent) {
+      PrintLogHeader(Serial);
+      serialHeaderSent = true;
+    }
+    PrintLogRow(Serial, rtcTimestamp, TimeStamp, Safe_Encoder_Counts);
+  } else {
+    serialHeaderSent = false;
   }
 
   static unsigned long lastClose = 0;
@@ -239,10 +283,10 @@ void LogData(unsigned long TimeStamp) {
     lastClose = TimeStamp;
   }
 
-  static int chill_serial_bro = 0;
-  chill_serial_bro++;
-  if (chill_serial_bro >= 50) {
-    chill_serial_bro = 0;
+  static int serialPrintCounter = 0;
+  serialPrintCounter++;
+  if (serialPrintCounter >= 50) {
+    serialPrintCounter = 0;
     Serial.println();
     Serial.print("   Time [ms]:  ");
     Serial.print(TimeStamp);
@@ -277,6 +321,8 @@ void LogData(unsigned long TimeStamp) {
 void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
+
+  InitializeRTC();
 
   pinMode(ledPin, OUTPUT);
 
@@ -333,12 +379,12 @@ void setup() {
   SetPin(PWM_E);
   SetPin(PWM_F);
 
-  setPWM(chA);
-  setPWM(chB);
-  setPWM(chC);
-  setPWM(chD);
-  setPWM(chE);
-  setPWM(chF);
+  setPWM(motorPwmChannelA);
+  setPWM(motorPwmChannelB);
+  setPWM(motorPwmChannelC);
+  setPWM(motorPwmChannelD);
+  setPWM(motorPwmChannelE);
+  setPWM(motorPwmChannelF);
 
   if (!husb238.begin(HUSB238_I2CADDR_DEFAULT, &Wire)) {
     Serial.println("HUSB238 Init Failed. Check wiring.");
@@ -350,7 +396,7 @@ void setup() {
   husb238.requestPD();
   delay(500);
 
-  if (!SD.begin(chipselect)) {
+  if (!SD.begin(sdChipSelect)) {
     while (1) {
       digitalWrite(ledPin, HIGH);
       delay(100);
@@ -359,8 +405,8 @@ void setup() {
     }
   }
 
-  byte Rasengan[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
-  Serial1.write(Rasengan, 5);
+  byte imuWakeCommand[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
+  Serial1.write(imuWakeCommand, 5);
 
   DataFile = SD.open("LightWheels_Rover_Combined.csv", FILE_WRITE);
   if (!DataFile) {
@@ -368,7 +414,7 @@ void setup() {
     return;
   }
 
-  DataFile.println("Time_ms,Roll,Pitch,Yaw,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
+  PrintLogHeader(DataFile);
 }
 
 void loop() {
@@ -382,7 +428,7 @@ void loop() {
   EnsureMotorPower();
 
   for (int i = 0; i < 6; i++) {
-    MotorPWM[i] = drivePWM;
+    MotorPWM[i] = forwardDrivePwm;
   }
 
   ApplyMotorPWM();

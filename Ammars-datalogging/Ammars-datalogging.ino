@@ -3,18 +3,18 @@
 File DataFile; // global file object so all functions can write to it
 
 // ENCODER PINS ;0
-#define Wheel_A_Channel_A 52
-#define Wheel_A_Channel_B 53
-#define Wheel_B_Channel_A 50
-#define Wheel_B_Channel_B 51
-#define Wheel_C_Channel_A 44  
-#define Wheel_C_Channel_B 45 
-#define Wheel_D_Channel_A 42  
-#define Wheel_D_Channel_B 43  
-#define Wheel_E_Channel_A 48 
-#define Wheel_E_Channel_B 49      // NO PIN 10 HEYA
-#define Wheel_F_Channel_A 46
-#define Wheel_F_Channel_B 47
+#define Wheel_A_Channel_A 1
+#define Wheel_A_Channel_B 2
+#define Wheel_B_Channel_A 3 
+#define Wheel_B_Channel_B 4  
+#define Wheel_C_Channel_A 5  
+#define Wheel_C_Channel_B 6  
+#define Wheel_D_Channel_A 7  
+#define Wheel_D_Channel_B 8  
+#define Wheel_E_Channel_A 9  
+#define Wheel_E_Channel_B 11      // NO PIN 10 HEYA
+#define Wheel_F_Channel_A 12
+#define Wheel_F_Channel_B 13
 
 // IMU PINS ;)
 #define tx 18
@@ -214,7 +214,7 @@ void setup(){
     pinMode(30, OUTPUT); pinMode(31, OUTPUT);
     pinMode(32, OUTPUT); pinMode(33, OUTPUT);
     digitalWrite(30, HIGH); digitalWrite(31, LOW);
-    digitalWrite(32, HIGH); digitalWrite(33, LOW);
+    digitalWrite(32, LOW); digitalWrite(33, HIGH);
       
     // MIDDLE LIGHTWHEEELS
     pinMode(26, OUTPUT); pinMode(27, OUTPUT);
@@ -227,7 +227,7 @@ void setup(){
     pinMode(25, OUTPUT); pinMode(24, OUTPUT);
     pinMode(23, OUTPUT); pinMode(22, OUTPUT);
     digitalWrite(25, HIGH); digitalWrite(24, LOW);
-    digitalWrite(23, HIGH); digitalWrite(22, LOW);
+    digitalWrite(23, LOW); digitalWrite(22, HIGH);
 
 /*
 // TURN TEST: Spin inplace for 10 seconds
@@ -255,11 +255,12 @@ else{
   }
 }   */
  // ENABLES PWM OUTPUT
-     // PWM INIT
-    SetPin(35); SetPin(37); SetPin(39);
-    SetPin(41); SetPin(34); SetPin(36);
-
-   
+    SetPin(35);
+    SetPin(37);
+    SetPin(39);
+    SetPin(41);
+    SetPin(44);
+    SetPin(45);
     setPWM(0);
     setPWM(1);
     setPWM(2);
@@ -290,6 +291,7 @@ else{
         DataFile.println("Time_ms, Roll, Pitch, Yaw, M1_Count, M2_Count, M3_Count, M4_Count, M5_Count, M6_Count, V1_PWM, V2_PWM, V3_PWM, V4_PWM, V5_PWM, V6_PWM");
     }   
 // ADD VOLTAGE IN ABOVE HEREEEEEEEEEEEEEEEEEEEEEE
+  Serial.print("   Time [ms]:  ");
 }
 
 void loop(){     // LIKE WHILE TRUE INSIDE MAIN
@@ -304,22 +306,22 @@ void loop(){     // LIKE WHILE TRUE INSIDE MAIN
     // SUSUMEEE! FORWARD MOTION CONTROL! TATAKEE! KEEP MOVING FORWARD!
     if (currentMillis - startTime < 10000){
         // 10 SECOND SUSUMEEEEE FORWARD
-         MotorPWM[0] =180;   // forward SPEEEEED "could be adjusted from 0-255"
-         MotorPWM[1] =180;   // forward SPEEEEED "could be adjusted from 0-255"
-         MotorPWM[2] =180;   // forward SPEEEEED "could be adjusted from 0-255"
-         MotorPWM[3] =180;   // forward SPEEEEED "could be adjusted from 0-255"
-         MotorPWM[4] =180;   // forward SPEEEEED "could be adjusted from 0-255"
-         MotorPWM[5] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+     //   MotorPWM[0] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+      //  MotorPWM[1] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+      //  MotorPWM[2] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+      //  MotorPWM[3] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+      //  MotorPWM[4] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+     //   MotorPWM[5] =120;   // forward SPEEEEED "could be adjusted from 0-255"
 
 
         //TURN RIGHT
-        //MotorPWM[0] =145;   //   SPEEEEED "could be adjusted from 0-255"
-    /// //   MotorPWM[2] =145;   //   SPEEEEED "could be adjusted from 0-255"
-      //  MotorPWM[4] =145;   //      SPEEEEED "could be adjusted from 0-255"
+        MotorPWM[0] =140;   //   SPEEEEED "could be adjusted from 0-255"
+        MotorPWM[2] =140;   //   SPEEEEED "could be adjusted from 0-255"
+        MotorPWM[4] =140;   //      SPEEEEED "could be adjusted from 0-255"
         
-       // MotorPWM[1] =80;   //  SPEEEEED "could be adjusted from 0-255"
-       // MotorPWM[3] =80;   //   SPEEEEED "could be adjusted from 0-255"
-       // MotorPWM[5] =80;   //   SPEEEEED "could be adjusted from 0-255" 
+        MotorPWM[1] =80;   //  SPEEEEED "could be adjusted from 0-255"
+        MotorPWM[3] =80;   //   SPEEEEED "could be adjusted from 0-255"
+        MotorPWM[5] =80;   //   SPEEEEED "could be adjusted from 0-255" 
  
 
  
