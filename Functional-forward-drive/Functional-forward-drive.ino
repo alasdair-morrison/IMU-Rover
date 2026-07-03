@@ -1,3 +1,9 @@
+#include <Wire.h>
+#include <Adafruit_HUSB238.h>
+
+// Instantiate the HUSB238 object
+Adafruit_HUSB238 husb238;
+
 //Front Wheels
 #define PWM_A 35 //PWM Out Motor A
 #define in1_A 30 //Enable 1 Motor A
@@ -77,6 +83,23 @@ void setPWM(int channel) {
 }
 
 void setup() {
+  Serial.begin(115200);
+  while (!Serial) delay(10); 
+
+  // 2. Initialize the I2C communication on the Due's default Wire pins (20 & 21)
+  if (!husb238.begin(HUSB238_I2CADDR_DEFAULT, &Wire)) {
+    Serial.println("HUSB238 Init Failed. Check wiring.");
+    while (1) delay(10); // Halt execution if the chip isn't found to protect your circuit
+  }
+
+  // 3. Command the HUSB238 to request 9V
+  husb238.selectPD(PD_SRC_9V); // Selects the 9V profile from the internal register
+  husb238.requestPD();         // Transmits the request to the battery
+
+  // 4. Give the battery and HUSB238 a moment to finalize the handshake 
+  // before your main project starts pulling heavy current.
+  delay(500);
+
   //Front Wheel Setup
   pinMode(in1_A, OUTPUT);
   pinMode(in2_A, OUTPUT);
@@ -126,6 +149,17 @@ void setup() {
 }
 //***ALL DUTY CYCLES ARE INVERTED DUE TO AVAIALBLE PINS 0 = 100% & 1200 = 0%***
 void loop() {
+  // Voltage Confirmation stage
+  HUSB238_VoltageSetting currentVoltage = husb238.getPDSrcVoltage();
+
+  // If the battery tripped and dropped us back to the 5V fallback...
+  if (currentVoltage != PD_9V) {
+    Serial.println("Voltage drop detected! Renegotiating 9V...");
+    husb238.selectPD(PD_SRC_9V);
+    husb238.requestPD();
+    delay(200); // Brief pause to allow the handshake to re-establish
+  }
+  
   PWMC_SetDutyCycle(PWM, chA, 300); // Channel: 0, Duty cycle: 75 %
   PWMC_SetDutyCycle(PWM, chB, 300); // Channel: 1, Duty cycle: 75 %
   digitalWrite(in1_A, HIGH);

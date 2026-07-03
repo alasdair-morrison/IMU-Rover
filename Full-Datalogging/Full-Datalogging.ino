@@ -28,8 +28,8 @@
 
 
 // ENCODER PINS ;0
-#define Wheel_A_Channel_A 50  
-#define Wheel_A_Channel_B 51
+#define Wheel_A_Channel_A 1
+#define Wheel_A_Channel_B 2
 #define Wheel_B_Channel_A 3 
 #define Wheel_B_Channel_B 4  
 #define Wheel_C_Channel_A 5  
