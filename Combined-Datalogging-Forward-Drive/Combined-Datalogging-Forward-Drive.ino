@@ -1,12 +1,12 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <SD.h>
-#include <RTCDue.h>
+#include <RTClib.h>
 #include <Adafruit_HUSB238.h>
 
 Adafruit_HUSB238 husb238;
 File DataFile;
-RTCDue rtc(XTAL);
+RTC_PCF8523 rtc;
 
 // Motor driver pins
 #define PWM_A 35
@@ -53,6 +53,7 @@ RTCDue rtc(XTAL);
 const int sdChipSelect = 10;
 const int ledPin = 13;
 const unsigned long interval = 10;
+const unsigned long serialMirrorInterval = 100;
 const int forwardDrivePwm = 180;
 
 uint32_t pwmClockFrequencyHz = 42000000;
@@ -73,29 +74,47 @@ unsigned long previousMillis = 0;
 float Roll = 0;
 float Pitch = 0;
 float Yaw = 0;
+float Ax = 0;
+float Ay = 0;
+float Az = 0;
+float Gx = 0;
+float Gy = 0;
+float Gz = 0;
 float supplyVoltage = 9.0;
 bool serialHeaderSent = false;
 
 void InitializeRTC() {
-  rtc.begin();
-  rtc.setTime(16, 55, 16);
-  rtc.setDate(3, 7, 2026);
+  Wire.begin();
+
+  if (!rtc.begin()) {
+    if (Serial) {
+      Serial.println("RTC init failed: check the shield RTC chip and I2C wiring.");
+    }
+    while (1) {
+      delay(10);
+    }
+  }
+
+  if (!rtc.initialized()) {
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
 }
 
 void FormatRTCTimestamp(char* buffer, size_t bufferSize) {
+  DateTime now = rtc.now();
   snprintf(buffer,
            bufferSize,
            "%04u-%02d-%02d %02d:%02d:%02d",
-           rtc.getYear(),
-           rtc.getMonth(),
-           rtc.getDay(),
-           rtc.getHours(),
-           rtc.getMinutes(),
-           rtc.getSeconds());
+           now.year(),
+           now.month(),
+           now.day(),
+           now.hour(),
+           now.minute(),
+           now.second());
 }
 
 void PrintLogHeader(Print& output) {
-  output.println("RTC_Timestamp,Time_ms,Roll,Pitch,Yaw,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
+  output.println("RTC_Timestamp,Time_ms,Roll,Pitch,Yaw,Ax,Ay,Az,Gx,Gy,Gz,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
 }
 
 void PrintLogRow(Print& output, const char* rtcTimestamp, unsigned long timeStamp, const long* encoderCounts) {
@@ -108,6 +127,18 @@ void PrintLogRow(Print& output, const char* rtcTimestamp, unsigned long timeStam
   output.print(Pitch);
   output.print(",");
   output.print(Yaw);
+  output.print(",");
+  output.print(Ax);
+  output.print(",");
+  output.print(Ay);
+  output.print(",");
+  output.print(Az);
+  output.print(",");
+  output.print(Gx);
+  output.print(",");
+  output.print(Gy);
+  output.print(",");
+  output.print(Gz);
   output.print(",");
 
   for (int i = 0; i < 6; i++) {
@@ -215,25 +246,35 @@ void ISR_MOTOR_6() {
 
 void ReadIMU() {
   if (Serial1.available() >= 11) {
-    if (Serial1.read() == 0x55) {
-      byte type = Serial1.read();
-      if (type == 0x53) {
-        int16_t rRaw = (Serial1.read() | (Serial1.read() << 8));
-        int16_t pRaw = (Serial1.read() | (Serial1.read() << 8));
-        int16_t yRaw = (Serial1.read() | (Serial1.read() << 8));
+    if (Serial1.read() != 0x55) {
+      return;
+    }
 
-        for (int i = 0; i < 3; i++) {
-          Serial1.read();
-        }
+    byte type = Serial1.read();
+    int16_t rRaw = (Serial1.read() | (Serial1.read() << 8));
+    int16_t pRaw = (Serial1.read() | (Serial1.read() << 8));
+    int16_t yRaw = (Serial1.read() | (Serial1.read() << 8));
 
-        Roll = (float)rRaw / 32768.0 * 180.0;
-        Pitch = (float)pRaw / 32768.0 * 180.0;
-        Yaw = (float)yRaw / 32768.0 * 180.0;
+    for (int i = 0; i < 3; i++) {
+      Serial1.read();
+    }
 
-        if (abs(Roll) > 180 || abs(Pitch) > 180 || abs(Yaw) > 180) {
-          return;
-        }
-      }
+    if (type == 0x51) {
+      Ax = (float)rRaw / 32768.0 * 16.0;
+      Ay = (float)pRaw / 32768.0 * 16.0;
+      Az = (float)yRaw / 32768.0 * 16.0;
+    } else if (type == 0x52) {
+      Gx = (float)rRaw / 32768.0 * 2000.0;
+      Gy = (float)pRaw / 32768.0 * 2000.0;
+      Gz = (float)yRaw / 32768.0 * 2000.0;
+    } else if (type == 0x53) {
+      Roll = (float)rRaw / 32768.0 * 180.0;
+      Pitch = (float)pRaw / 32768.0 * 180.0;
+      Yaw = (float)yRaw / 32768.0 * 180.0;
+    }
+
+    if (abs(Roll) > 180 || abs(Pitch) > 180 || abs(Yaw) > 180) {
+      return;
     }
   }
 }
@@ -265,13 +306,15 @@ void LogData(unsigned long TimeStamp) {
     digitalWrite(ledPin, LOW);
   }
 
-  if (Serial) {
+  static unsigned long lastSerialRowPrint = 0;
+  if (Serial && TimeStamp - lastSerialRowPrint >= serialMirrorInterval) {
+    lastSerialRowPrint = TimeStamp;
     if (!serialHeaderSent) {
       PrintLogHeader(Serial);
       serialHeaderSent = true;
     }
     PrintLogRow(Serial, rtcTimestamp, TimeStamp, Safe_Encoder_Counts);
-  } else {
+  } else if (!Serial) {
     serialHeaderSent = false;
   }
 
@@ -283,10 +326,9 @@ void LogData(unsigned long TimeStamp) {
     lastClose = TimeStamp;
   }
 
-  static int serialPrintCounter = 0;
-  serialPrintCounter++;
-  if (serialPrintCounter >= 50) {
-    serialPrintCounter = 0;
+  static unsigned long lastDebugPrint = 0;
+  if (TimeStamp - lastDebugPrint >= 1000) {
+    lastDebugPrint = TimeStamp;
     Serial.println();
     Serial.print("   Time [ms]:  ");
     Serial.print(TimeStamp);
@@ -315,6 +357,24 @@ void LogData(unsigned long TimeStamp) {
     Serial.print("   |   Y: ");
     Serial.print(Yaw);
     Serial.println();
+
+    Serial.print("  Linear Accel:  ");
+    Serial.print("   Ax: ");
+    Serial.print(Ax);
+    Serial.print("   Ay: ");
+    Serial.print(Ay);
+    Serial.print("   Az: ");
+    Serial.print(Az);
+    Serial.println();
+
+    Serial.print("  Gyro:  ");
+    Serial.print("             Gx: ");
+    Serial.print(Gx);
+    Serial.print("   Gy: ");
+    Serial.print(Gy);
+    Serial.print("   Gz: ");
+    Serial.print(Gz);
+    Serial.println();
   }
 }
 
@@ -322,7 +382,21 @@ void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
 
-  InitializeRTC();
+  unsigned long serialWaitStart = millis();
+  while (!Serial && millis() - serialWaitStart < 5000) {
+    delay(10);
+  }
+
+  if (Serial) {
+    Serial.println("Combined logger starting...");
+    Serial.println("USB serial connected at 115200 baud.");
+  }
+
+  //InitializeRTC();
+
+  if (Serial) {
+    Serial.println("RTC Ready");
+  }
 
   pinMode(ledPin, OUTPUT);
 
@@ -339,12 +413,20 @@ void setup() {
   pinMode(Wheel_F_Channel_A, INPUT_PULLUP);
   pinMode(Wheel_F_Channel_B, INPUT_PULLUP);
 
+  if (Serial) {
+    Serial.println("encoder pins setup");
+  }
+
   attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_A), ISR_MOTOR_1, RISING);
   attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_A), ISR_MOTOR_2, RISING);
   attachInterrupt(digitalPinToInterrupt(Wheel_C_Channel_A), ISR_MOTOR_3, RISING);
   attachInterrupt(digitalPinToInterrupt(Wheel_D_Channel_A), ISR_MOTOR_4, RISING);
   attachInterrupt(digitalPinToInterrupt(Wheel_E_Channel_A), ISR_MOTOR_5, RISING);
   attachInterrupt(digitalPinToInterrupt(Wheel_F_Channel_A), ISR_MOTOR_6, RISING);
+
+  if (Serial) {
+    Serial.println("encoder interrupts ready");
+  }
 
   pinMode(in1_A, OUTPUT);
   pinMode(in2_A, OUTPUT);
@@ -386,6 +468,10 @@ void setup() {
   setPWM(motorPwmChannelE);
   setPWM(motorPwmChannelF);
 
+  if (Serial) {
+    Serial.println("movement pins setup");
+  }
+
   if (!husb238.begin(HUSB238_I2CADDR_DEFAULT, &Wire)) {
     Serial.println("HUSB238 Init Failed. Check wiring.");
     while (1) {
@@ -396,6 +482,10 @@ void setup() {
   husb238.requestPD();
   delay(500);
 
+  if (Serial) {
+    Serial.println("Power and drive systems configured");
+  }
+
   if (!SD.begin(sdChipSelect)) {
     while (1) {
       digitalWrite(ledPin, HIGH);
@@ -405,16 +495,25 @@ void setup() {
     }
   }
 
+  if (Serial) {
+    Serial.println("sd card setup complete");
+  }
+
   byte imuWakeCommand[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
   Serial1.write(imuWakeCommand, 5);
 
-  DataFile = SD.open("LightWheels_Rover_Combined.csv", FILE_WRITE);
+  DataFile = SD.open("Rover_Data.csv", FILE_WRITE);
   if (!DataFile) {
     digitalWrite(ledPin, HIGH);
     return;
   }
 
   PrintLogHeader(DataFile);
+
+  if (Serial) {
+    PrintLogHeader(Serial);
+    serialHeaderSent = true;
+  }
 }
 
 void loop() {

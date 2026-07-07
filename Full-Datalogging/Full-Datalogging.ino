@@ -37,7 +37,7 @@
 #define Wheel_D_Channel_A 7  
 #define Wheel_D_Channel_B 8  
 #define Wheel_E_Channel_A 9  
-#define Wheel_E_Channel_B 11      // NO PIN 10 HEYA
+#define Wheel_E_Channel_B 11      // NO PIN 10
 #define Wheel_F_Channel_A 12
 #define Wheel_F_Channel_B 13
 
@@ -77,8 +77,7 @@ int chD = 3;
 int chE = 5;
 int chF = 6;
 
-void SetPin(uint8_t pin)
-{
+void SetPin(uint8_t pin) {
   PIO_Configure(g_APinDescription[pin].pPort,
                 PIO_PERIPH_B, 
                 g_APinDescription[pin].ulPin,

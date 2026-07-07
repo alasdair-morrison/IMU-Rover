@@ -3,18 +3,18 @@
 File DataFile; // global file object so all functions can write to it
 
 // ENCODER PINS ;0
-#define Wheel_A_Channel_A 1
-#define Wheel_A_Channel_B 2
-#define Wheel_B_Channel_A 3 
-#define Wheel_B_Channel_B 4  
-#define Wheel_C_Channel_A 5  
-#define Wheel_C_Channel_B 6  
-#define Wheel_D_Channel_A 7  
-#define Wheel_D_Channel_B 8  
-#define Wheel_E_Channel_A 9  
-#define Wheel_E_Channel_B 11      // NO PIN 10 HEYA
-#define Wheel_F_Channel_A 12
-#define Wheel_F_Channel_B 13
+#define Wheel_A_Channel_A 52
+#define Wheel_A_Channel_B 53
+#define Wheel_B_Channel_A 50
+#define Wheel_B_Channel_B 51
+#define Wheel_C_Channel_A 48  
+#define Wheel_C_Channel_B 49
+#define Wheel_D_Channel_A 46 
+#define Wheel_D_Channel_B 47  
+#define Wheel_E_Channel_A 44 
+#define Wheel_E_Channel_B 45      // NO PIN 10 HEYA
+#define Wheel_F_Channel_A 42
+#define Wheel_F_Channel_B 43
 
 // IMU PINS ;)
 #define tx 18
@@ -25,7 +25,7 @@ File DataFile; // global file object so all functions can write to it
 volatile long counts[6] = {0, 0, 0, 0, 0, 0};  // Stores pulse counts for 6 encoders 
 
 // 2 XD: MOTOR HAKI
-int PWM_Channel[6] = {0,1,2,3,5,6}; // chA to chF
+int PWM_Channel[6] = {0,1,2,3,5,6};
 // Stores input commands (0–255) :) Used for logging later (input to output comparison)
 int MotorPWM[6] = {0, 0, 0, 0, 0, 0};  // Current SPEED being sent to each motor from a range of 0 to 255
 
@@ -126,7 +126,11 @@ const int ledPin = 13; // Status LED
 unsigned long previousMillis = 0;
 const long interval = 10; // 10 ms = 100 Hz frequency babyyy
 // IMU ANGLES WOHOOOOOOOOOOOOOOO XD
-float Roll = 0, Pitch = 0, Yaw = 0;
+float Roll = 0, Pitch = 0, Yaw = 0; //(IMU packet 0x53)
+// Linear acceleration (IMU packet 0x51)
+float Ax = 0, Ay = 0, Az = 0;
+// Angular velocity / gyro (IMU packet 0x52)
+float Gx = 0, Gy = 0, Gz = 0;
 
 // CONFIGURES PINS FOR PWM HARDWARE LOW-LEVEL STUFF
 void SetPin(uint8_t pin){
@@ -186,15 +190,8 @@ void setup(){
 */
 
 
-    //Links pin to ISR, RISING = trigger on rising   edges_
-    attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_A), ISR_MOTOR_1, RISING); // CHANGE IS doubling resolution  BUT increasing noise sensitivity
-    attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_A), ISR_MOTOR_2, RISING);
-    attachInterrupt(digitalPinToInterrupt(Wheel_C_Channel_A), ISR_MOTOR_3, RISING);
-    attachInterrupt(digitalPinToInterrupt(Wheel_D_Channel_A), ISR_MOTOR_4, RISING);
-    attachInterrupt(digitalPinToInterrupt(Wheel_E_Channel_A), ISR_MOTOR_5, RISING);
-    attachInterrupt(digitalPinToInterrupt(Wheel_F_Channel_A), ISR_MOTOR_6, RISING);
 
-    /*
+    
     //Links pin to ISR, NOT ANYMORE EVERY RISING = RUN ISR BABYYY // NOW ITS CHANGE (rising + fall)IS doubling resolution  BUT increasing noise sensitivity
     attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_A), ISR_MOTOR_1, CHANGE); 
     attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_A), ISR_MOTOR_2, CHANGE);
@@ -202,7 +199,7 @@ void setup(){
     attachInterrupt(digitalPinToInterrupt(Wheel_D_Channel_A), ISR_MOTOR_4, CHANGE);
     attachInterrupt(digitalPinToInterrupt(Wheel_E_Channel_A), ISR_MOTOR_5, CHANGE);
     attachInterrupt(digitalPinToInterrupt(Wheel_F_Channel_A), ISR_MOTOR_6, CHANGE);
-    // ADD CHANNEL B FOR FULLL QUADRATURE BABYYY!! ACCURACY 10 BILLION PERCENT!!
+    /*// ADD CHANNEL B FOR FULLL QUADRATURE BABYYY!! ACCURACY 10 BILLION PERCENT!!
     attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_B), ISR_MOTOR_1, CHANGE); 
     attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_B), ISR_MOTOR_2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(Wheel_C_Channel_B), ISR_MOTOR_3, CHANGE);
@@ -214,7 +211,7 @@ void setup(){
     pinMode(30, OUTPUT); pinMode(31, OUTPUT);
     pinMode(32, OUTPUT); pinMode(33, OUTPUT);
     digitalWrite(30, HIGH); digitalWrite(31, LOW);
-    digitalWrite(32, LOW); digitalWrite(33, HIGH);
+    digitalWrite(32, HIGH); digitalWrite(33, LOW);
       
     // MIDDLE LIGHTWHEEELS
     pinMode(26, OUTPUT); pinMode(27, OUTPUT);
@@ -224,10 +221,10 @@ void setup(){
         
 
     // REAR LIGHTWHEEEEELS
-    pinMode(25, OUTPUT); pinMode(24, OUTPUT);
-    pinMode(23, OUTPUT); pinMode(22, OUTPUT);
-    digitalWrite(25, HIGH); digitalWrite(24, LOW);
-    digitalWrite(23, LOW); digitalWrite(22, HIGH);
+    pinMode(22, OUTPUT); pinMode(23, OUTPUT);
+    pinMode(24, OUTPUT); pinMode(25, OUTPUT);
+    digitalWrite(22, HIGH); digitalWrite(23, LOW);
+    digitalWrite(24, HIGH); digitalWrite(25, LOW);
 
 /*
 // TURN TEST: Spin inplace for 10 seconds
@@ -255,12 +252,14 @@ else{
   }
 }   */
  // ENABLES PWM OUTPUT
-    SetPin(35);
-    SetPin(37);
-    SetPin(39);
-    SetPin(41);
-    SetPin(44);
-    SetPin(45);
+SetPin(35);  // channel 0 -  MOTOR A EN
+SetPin(37);  // channel 1   B
+SetPin(39);  // channel 2   C
+SetPin(41);  // channel 3   D
+SetPin(34);  // channel 5   E  
+SetPin(36);  // channel 6   F
+ 
+   
     setPWM(0);
     setPWM(1);
     setPWM(2);
@@ -276,8 +275,7 @@ else{
     }
 
     // SEND  DATA TO IMU AT THE 100 Hz (The 5-byte NINJA RASENGAN SCROLL)
-    byte Rasengan[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    Serial1.write(Rasengan, 5);
+    byte Rasengan[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   Serial1.write(Rasengan, 5);
 
     // Create CSV Header for Sarah :)
     DataFile = SD.open("LightWheels_Rover.csv", FILE_WRITE);
@@ -288,10 +286,9 @@ else{
     }
     // IF SUCCESS, Writes header row
     if (DataFile){ 
-        DataFile.println("Time_ms, Roll, Pitch, Yaw, M1_Count, M2_Count, M3_Count, M4_Count, M5_Count, M6_Count, V1_PWM, V2_PWM, V3_PWM, V4_PWM, V5_PWM, V6_PWM");
+        DataFile.println("Time_ms, Roll, Pitch, Yaw, Ax, Ay, Az, Gx, Gy, Gz, Wheel_A, Wheel_B, Wheel_C, Wheel_D, Wheel_E, Wheel_F");
     }   
-// ADD VOLTAGE IN ABOVE HEREEEEEEEEEEEEEEEEEEEEEE
-  Serial.print("   Time [ms]:  ");
+    // ADD VOLTAGE IN ABOVE HEREEEEEEEEEEEEEEEEEEEEEE
 }
 
 void loop(){     // LIKE WHILE TRUE INSIDE MAIN
@@ -306,27 +303,23 @@ void loop(){     // LIKE WHILE TRUE INSIDE MAIN
     // SUSUMEEE! FORWARD MOTION CONTROL! TATAKEE! KEEP MOVING FORWARD!
     if (currentMillis - startTime < 10000){
         // 10 SECOND SUSUMEEEEE FORWARD
-     //   MotorPWM[0] =120;   // forward SPEEEEED "could be adjusted from 0-255"
-      //  MotorPWM[1] =120;   // forward SPEEEEED "could be adjusted from 0-255"
-      //  MotorPWM[2] =120;   // forward SPEEEEED "could be adjusted from 0-255"
-      //  MotorPWM[3] =120;   // forward SPEEEEED "could be adjusted from 0-255"
-      //  MotorPWM[4] =120;   // forward SPEEEEED "could be adjusted from 0-255"
-     //   MotorPWM[5] =120;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[0] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[1] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[2] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[3] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[4] =180;   // forward SPEEEEED "could be adjusted from 0-255"
+         MotorPWM[5] =180;   // forward SPEEEEED "could be adjusted from 0-255"
 
 
         //TURN RIGHT
-        MotorPWM[0] =140;   //   SPEEEEED "could be adjusted from 0-255"
-        MotorPWM[2] =140;   //   SPEEEEED "could be adjusted from 0-255"
-        MotorPWM[4] =140;   //      SPEEEEED "could be adjusted from 0-255"
+        //MotorPWM[0] =145;   //   SPEEEEED "could be adjusted from 0-255"
+    /// //   MotorPWM[2] =145;   //   SPEEEEED "could be adjusted from 0-255"
+      //  MotorPWM[4] =145;   //      SPEEEEED "could be adjusted from 0-255"
         
-        MotorPWM[1] =80;   //  SPEEEEED "could be adjusted from 0-255"
-        MotorPWM[3] =80;   //   SPEEEEED "could be adjusted from 0-255"
-        MotorPWM[5] =80;   //   SPEEEEED "could be adjusted from 0-255" 
+       // MotorPWM[1] =80;   //  SPEEEEED "could be adjusted from 0-255"
+       // MotorPWM[3] =80;   //   SPEEEEED "could be adjusted from 0-255"
+       // MotorPWM[5] =80;   //   SPEEEEED "could be adjusted from 0-255" 
  
-
- 
-
-
 
         /*
         // SPIN IN PLACE
@@ -352,6 +345,7 @@ void loop(){     // LIKE WHILE TRUE INSIDE MAIN
 
     // Always listen for IMU data in the background
     ReadIMU();    
+
     
     // The 100 Hz Heartbeat DRUMS OF LIBERATION: Log every 10 ms
     if (currentMillis - previousMillis >= interval){
@@ -362,10 +356,10 @@ void loop(){     // LIKE WHILE TRUE INSIDE MAIN
 
 void ReadIMU() {
     // Wait for/Check if we have a full 11-byte packet
-    if (Serial1.available() >= 11){
-        if (Serial1.read() == 0x55){ // Check header
-            byte type = Serial1.read();
-            if (type == 0x53) { // Means Euler angles// LITTLE ENDIAN
+    if (Serial1.available() < 11) return;
+    
+    if (Serial1.read() != 0x55) return; // Check header
+    byte type = Serial1.read();
                 // Extract raw data, reads two bytes from Serial1 and combines them into a single 16‑bit integer (int16_t)
                 int16_t rRaw = (Serial1.read() | (Serial1.read() << 8));
                 // Serial1.read() returns one byte (0–255). The first read() becomes the low byte.
@@ -376,20 +370,30 @@ void ReadIMU() {
                 // Discard temperature and checksum, the last 3 bytes i think 
                 for(int i=0; i<3; i++) Serial1.read();
 
+          if (type == 0x51) {                     // WT901 linear accel scale = ±16g
+                // Convert to human ANGLES degrees
+                Ax = (float)rRaw / 32768.0 * 16.0;
+                Ay = (float)pRaw / 32768.0 * 16.0;
+                Az = (float)yRaw / 32768.0 * 16.0;      
+                }    
+          else if (type == 0x52) {                 // WT901 angular velo gyro scale = ±2000°/s
+                // Convert to human ANGLES degrees
+                Gx = (float)rRaw / 32768.0 * 2000.0;
+                Gy = (float)pRaw / 32768.0 * 2000.0;
+                Gz = (float)yRaw / 32768.0 * 2000.0;  
+                }
+          else if (type == 0x53) {                 // Means Euler angles // LITTLE ENDIAN
                 // Convert to human ANGLES degrees
                 Roll = (float)rRaw / 32768.0 * 180.0;
                 Pitch = (float)pRaw / 32768.0 * 180.0;
                 Yaw = (float)yRaw / 32768.0 * 180.0;
+                }
                 
                 //Reject invalid data
                 if (abs(Roll) > 180 || abs(Pitch) > 180 || abs(Yaw) > 180){
                   return;
                 }
-              } 
-          }
-      }
-  }
-
+}
 
 // VOLTAGE GOING IN MOTORS
 float supplyVoltage = 7.0;   // CHANGE 7 V  MAYBE???????
@@ -410,6 +414,12 @@ void LogData(unsigned long TimeStamp) {
         DataFile.print(Roll); DataFile.print(",");  // IM SO HAPPPPPPPPPPPPPPPPY!
         DataFile.print(Pitch); DataFile.print(",");  // FINALLYYYYYYYYYYYYYYYY
         DataFile.print(Yaw); DataFile.print(",");    // THIS TOOK SO LONG IM HAPPPYPYPYPYPYPYPY!!!!!!
+        DataFile.print(Ax); DataFile.print(",");
+        DataFile.print(Ay); DataFile.print(",");
+        DataFile.print(Az); DataFile.print(",");
+        DataFile.print(Gx); DataFile.print(",");
+        DataFile.print(Gy); DataFile.print(",");
+        DataFile.print(Gz); DataFile.print(",");
 
         /*// Loop for encoder values: Log all 6 encoder counts
         for(int i = 0; i < 6; i++){
@@ -418,7 +428,11 @@ void LogData(unsigned long TimeStamp) {
         } */
         DataFile.print(Safe_Encoder_Counts[0]);
         DataFile.print(",");             // a comma to seperate data        
-        DataFile.print(Safe_Encoder_Counts[1]);
+        DataFile.print(Safe_Encoder_Counts[1]);      
+        DataFile.print(",");             // a comma to seperate data          
+        DataFile.print(Safe_Encoder_Counts[2]);
+        DataFile.print(",");             // a comma to seperate data        
+        DataFile.print(Safe_Encoder_Counts[3]);
         DataFile.print(",");             // a comma to seperate data        
         DataFile.print(Safe_Encoder_Counts[4]);
         DataFile.print(",");             // a comma to seperate data        
@@ -468,10 +482,10 @@ void LogData(unsigned long TimeStamp) {
     Serial.print(Safe_Encoder_Counts[0]);
     Serial.print("   |    B: ");
     Serial.print(Safe_Encoder_Counts[1]);
-    //Serial.print("   |   C: ");
-    //Serial.print(Safe_Encoder_Counts[2]);
-    // Serial.print("   |   D: ");
-    //Serial.print(Safe_Encoder_Counts[3]);
+    Serial.print("   |   C: ");
+    Serial.print(Safe_Encoder_Counts[2]);
+    Serial.print("   |   D: ");
+    Serial.print(Safe_Encoder_Counts[3]);
     Serial.print("   |   E: ");
     Serial.print(Safe_Encoder_Counts[4]);
     Serial.print("   |   F: ");
@@ -479,14 +493,30 @@ void LogData(unsigned long TimeStamp) {
     Serial.println();       // new line 
     
     // IMU ANGLES 
-    Serial.print("  IMU Euler Angles:  ");
-    Serial.print(" R: ");
+    Serial.print("  Euler Angles:  ");
+    Serial.print("   R: ");
     Serial.print(Roll);
     Serial.print("   |    P: ");
     Serial.print(Pitch);
     Serial.print("   |   Y: ");
     Serial.print(Yaw);  
     Serial.println();       // new line
+
+    // Linear Accel + Gyro
+    Serial.print("  Linear Accel:  ");
+    Serial.print("   Ax: "); Serial.print(Ax);  
+    Serial.print("   Ay: "); Serial.print(Ay); 
+    Serial.print("   Az: "); Serial.print(Az); 
+        Serial.println();       // new line
+
+    Serial.print("  Gyro:  ");
+    Serial.print("             Gx: "); Serial.print(Gx); 
+    Serial.print("   Gy: "); Serial.print(Gy); 
+    Serial.print("   Gz: "); Serial.print(Gz); 
+       Serial.println();       // new line
+
+
+
     // CALCULATE VOLTAGE_IN FROM PWM
   /*  for(int i = 0; i < 6; i++){
         float motorVoltage = (MotorPWM[i] / 255.0) * supplyVoltage;
