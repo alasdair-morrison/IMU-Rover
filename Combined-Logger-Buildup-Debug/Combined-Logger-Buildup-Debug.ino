@@ -77,14 +77,151 @@ void setPWM(int channel) {
                            0, // Dead time PWMH output is not inverted    
                            0);  // Dead time PWML output is not inverted
   PWMC_SetPeriod(PWM, channel, 1200); // Channel: variable, Period: 1/(1200/42 Mhz) = ~35 kHz
-  PWMC_SetDutyCycle(PWM, channel, 600); // Channel: variable, Duty cycle: 50 %
+  PWMC_SetDutyCycle(PWM, channel, 1200); // Channel: variable, Duty cycle: 0 %
   PWMC_SetDeadTime(PWM, channel, 42, 42); // Channel: variable, Rising and falling edge dead time: 42/42 Mhz = 1 us
   PWMC_EnableChannel(PWM, channel); // Channel: variable
+}
+
+void forward(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); // Channel: 0, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chB, trueDuty); // Channel: 1, Duty cycle: 75 %
+  digitalWrite(in1_A, HIGH);
+  digitalWrite(in2_A, LOW);
+  digitalWrite(in1_B, HIGH);
+  digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); // Channel: 2, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chD, trueDuty); // Channel: 3, Duty cycle: 75 %
+  digitalWrite(in1_C, HIGH);
+  digitalWrite(in2_C, LOW);
+  digitalWrite(in1_D, HIGH);
+  digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); // Channel: 5, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chF, trueDuty); // Channel: 6, Duty cycle: 75 %
+  digitalWrite(in1_E, HIGH);
+  digitalWrite(in2_E, LOW);
+  digitalWrite(in1_F, HIGH);
+  digitalWrite(in2_F, LOW);
+  if(Serial) {
+    Serial.println("Driving Forwards");
+  }
+}
+
+void reverse(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); // Channel: 0, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chB, trueDuty); // Channel: 1, Duty cycle: 75 %
+  digitalWrite(in1_A, LOW);
+  digitalWrite(in2_A, HIGH);
+  digitalWrite(in1_B, LOW);
+  digitalWrite(in2_B, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); // Channel: 2, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chD, trueDuty); // Channel: 3, Duty cycle: 75 %
+  digitalWrite(in1_C, LOW);
+  digitalWrite(in2_C, HIGH);
+  digitalWrite(in1_D, LOW);
+  digitalWrite(in2_D, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); // Channel: 5, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chF, trueDuty); // Channel: 6, Duty cycle: 75 %
+  digitalWrite(in1_E, LOW);
+  digitalWrite(in2_E, HIGH);
+  digitalWrite(in1_F, LOW);
+  digitalWrite(in2_F, HIGH);
+  if(Serial) {
+    Serial.println("Driving in Reverse");
+  }
+}
+
+void turnRight(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); // Channel: 0, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chB, trueDuty); // Channel: 1, Duty cycle: 75 %
+  digitalWrite(in1_A, LOW);
+  digitalWrite(in2_A, HIGH);
+  digitalWrite(in1_B, HIGH);
+  digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); // Channel: 2, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chD, trueDuty); // Channel: 3, Duty cycle: 75 %
+  digitalWrite(in1_C, LOW);
+  digitalWrite(in2_C, HIGH);
+  digitalWrite(in1_D, HIGH);
+  digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); // Channel: 5, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chF, trueDuty); // Channel: 6, Duty cycle: 75 %
+  digitalWrite(in1_E, LOW);
+  digitalWrite(in2_E, HIGH);
+  digitalWrite(in1_F, HIGH);
+  digitalWrite(in2_F, LOW);
+  if(Serial) {
+    Serial.println("Turning Right");
+  }
+}
+
+void turnLeft(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); // Channel: 0, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chB, trueDuty); // Channel: 1, Duty cycle: 75 %
+  digitalWrite(in1_A, HIGH);
+  digitalWrite(in2_A, LOW);
+  digitalWrite(in1_B, LOW);
+  digitalWrite(in2_B, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); // Channel: 2, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chD, trueDuty); // Channel: 3, Duty cycle: 75 %
+  digitalWrite(in1_C, HIGH);
+  digitalWrite(in2_C, LOW);
+  digitalWrite(in1_D, LOW);
+  digitalWrite(in2_D, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); // Channel: 5, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chF, trueDuty); // Channel: 6, Duty cycle: 75 %
+  digitalWrite(in1_E, HIGH);
+  digitalWrite(in2_E, LOW);
+  digitalWrite(in1_F, LOW);
+  digitalWrite(in2_F, HIGH);
+  if(Serial) {
+    Serial.println("Turning Left");
+  }
+}
+
+void stop() {
+  int trueDuty = 1200;
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); // Channel: 0, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chB, trueDuty); // Channel: 1, Duty cycle: 75 %
+  digitalWrite(in1_A, HIGH);
+  digitalWrite(in2_A, LOW);
+  digitalWrite(in1_B, HIGH);
+  digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); // Channel: 2, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chD, trueDuty); // Channel: 3, Duty cycle: 75 %
+  digitalWrite(in1_C, HIGH);
+  digitalWrite(in2_C, LOW);
+  digitalWrite(in1_D, HIGH);
+  digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); // Channel: 5, Duty cycle: 75 %
+  PWMC_SetDutyCycle(PWM, chF, trueDuty); // Channel: 6, Duty cycle: 75 %
+  digitalWrite(in1_E, HIGH);
+  digitalWrite(in2_E, LOW);
+  digitalWrite(in1_F, HIGH);
+  digitalWrite(in2_F, LOW);
+  if(Serial) {
+    Serial.println("Stopping");
+  }
 }
 
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10); 
+
+  Serial.println("BOOT OK");
 
   // 2. Initialize the I2C communication on the Due's default Wire pins (20 & 21)
   if (!husb238.begin(HUSB238_I2CADDR_DEFAULT, &Wire)) {
@@ -142,13 +279,14 @@ void setup() {
   SetPin(PWM_E); // PWMH5
   SetPin(PWM_F); // PWMH6
   
-  setPWM(chA); // sets up corresponding PWM channel to run at 50% duty cycle
+  setPWM(chA); // sets up corresponding PWM channel to run at 0% duty cycle
   setPWM(chB);
   setPWM(chC);
   setPWM(chD);
   setPWM(chE);
   setPWM(chF);
 }
+
 //***ALL DUTY CYCLES ARE INVERTED DUE TO AVAIALBLE PINS 0 = 100% & 1200 = 0%***
 void loop() {
   // Voltage Confirmation stage
@@ -162,25 +300,14 @@ void loop() {
     delay(200); // Brief pause to allow the handshake to re-establish
   }
   
-  PWMC_SetDutyCycle(PWM, chA, 300); // Channel: 0, Duty cycle: 75 %
-  PWMC_SetDutyCycle(PWM, chB, 300); // Channel: 1, Duty cycle: 75 %
-  digitalWrite(in1_A, HIGH);
-  digitalWrite(in2_A, LOW);
-  digitalWrite(in1_B, HIGH);
-  digitalWrite(in2_B, LOW);
-
-  PWMC_SetDutyCycle(PWM, chC, 300); // Channel: 2, Duty cycle: 75 %
-  PWMC_SetDutyCycle(PWM, chD, 300); // Channel: 3, Duty cycle: 75 %
-  digitalWrite(in1_C, HIGH);
-  digitalWrite(in2_C, LOW);
-  digitalWrite(in1_D, HIGH);
-  digitalWrite(in2_D, LOW);
-
-  PWMC_SetDutyCycle(PWM, chE, 300); // Channel: 5, Duty cycle: 75 %
-  PWMC_SetDutyCycle(PWM, chF, 300); // Channel: 6, Duty cycle: 75 %
-  digitalWrite(in1_E, HIGH);
-  digitalWrite(in2_E, LOW);
-  digitalWrite(in1_F, HIGH);
-  digitalWrite(in2_F, LOW);
-  delay(20); 
+  //forward(.75); //drive forward at 75% duty cycle
+  delay(5000);
+  //reverse(0.75); //drive backwards at 75% duty cycle
+  delay(5000); 
+  //turnLeft(0.75);
+  delay(5000);
+  //turnRight(0.75);
+  delay(5000);
+  stop();
+  delay(5000);
 }

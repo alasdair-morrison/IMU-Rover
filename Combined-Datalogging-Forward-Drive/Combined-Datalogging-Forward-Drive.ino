@@ -1,12 +1,10 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <SD.h>
-#include <RTClib.h>
 #include <Adafruit_HUSB238.h>
 
 Adafruit_HUSB238 husb238;
 File DataFile;
-RTC_PCF8523 rtc;
 
 // Motor driver pins
 #define PWM_A 35
@@ -68,6 +66,7 @@ volatile long counts[6] = {0, 0, 0, 0, 0, 0};
 int MotorPWM[6] = {0, 0, 0, 0, 0, 0};
 
 unsigned long startTime = 0;
+unsigned long programStartMillis = 0;
 bool started = false;
 unsigned long previousMillis = 0;
 
@@ -83,44 +82,19 @@ float Gz = 0;
 float supplyVoltage = 9.0;
 bool serialHeaderSent = false;
 
-void InitializeRTC() {
-  Wire.begin();
-
-  if (!rtc.begin()) {
-    if (Serial) {
-      Serial.println("RTC init failed: check the shield RTC chip and I2C wiring.");
-    }
-    while (1) {
-      delay(10);
-    }
-  }
-
-  if (!rtc.initialized()) {
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
-}
-
-void FormatRTCTimestamp(char* buffer, size_t bufferSize) {
-  DateTime now = rtc.now();
+void FormatElapsedTimestamp(char* buffer, size_t bufferSize, unsigned long elapsedMillis) {
   snprintf(buffer,
            bufferSize,
-           "%04u-%02d-%02d %02d:%02d:%02d",
-           now.year(),
-           now.month(),
-           now.day(),
-           now.hour(),
-           now.minute(),
-           now.second());
+           "%lu",
+           elapsedMillis);
 }
 
 void PrintLogHeader(Print& output) {
-  output.println("RTC_Timestamp,Time_ms,Roll,Pitch,Yaw,Ax,Ay,Az,Gx,Gy,Gz,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
+  output.println("Elapsed_ms,Roll,Pitch,Yaw,Ax,Ay,Az,Gx,Gy,Gz,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
 }
 
-void PrintLogRow(Print& output, const char* rtcTimestamp, unsigned long timeStamp, const long* encoderCounts) {
-  output.print(rtcTimestamp);
-  output.print(",");
-  output.print(timeStamp);
+void PrintLogRow(Print& output, const char* elapsedTimestamp, const long* encoderCounts) {
+  output.print(elapsedTimestamp);
   output.print(",");
   output.print(Roll);
   output.print(",");
@@ -160,6 +134,18 @@ void PrintLogRow(Print& output, const char* rtcTimestamp, unsigned long timeStam
   }
 
   output.println();
+}
+
+bool OpenNextLogFile(char* filename, size_t filenameSize) {
+  for (int fileIndex = 0; fileIndex < 100; fileIndex++) {
+    snprintf(filename, filenameSize, "Rover%02d.csv", fileIndex);
+    if (!SD.exists(filename)) {
+      DataFile = SD.open(filename, FILE_WRITE);
+      return DataFile;
+    }
+  }
+
+  return false;
 }
 
 void SetPin(uint8_t pin)
@@ -291,8 +277,9 @@ void EnsureMotorPower() {
 
 void LogData(unsigned long TimeStamp) {
   long Safe_Encoder_Counts[6];
-  char rtcTimestamp[32];
-  FormatRTCTimestamp(rtcTimestamp, sizeof(rtcTimestamp));
+  char elapsedTimestamp[32];
+  unsigned long elapsedMillis = TimeStamp - programStartMillis;
+  FormatElapsedTimestamp(elapsedTimestamp, sizeof(elapsedTimestamp), elapsedMillis);
 
   noInterrupts();
   for (int i = 0; i < 6; i++) {
@@ -302,7 +289,7 @@ void LogData(unsigned long TimeStamp) {
 
   if (DataFile) {
     digitalWrite(ledPin, HIGH);
-    PrintLogRow(DataFile, rtcTimestamp, TimeStamp, Safe_Encoder_Counts);
+    PrintLogRow(DataFile, elapsedTimestamp, Safe_Encoder_Counts);
     digitalWrite(ledPin, LOW);
   }
 
@@ -313,7 +300,7 @@ void LogData(unsigned long TimeStamp) {
       PrintLogHeader(Serial);
       serialHeaderSent = true;
     }
-    PrintLogRow(Serial, rtcTimestamp, TimeStamp, Safe_Encoder_Counts);
+    PrintLogRow(Serial, elapsedTimestamp, Safe_Encoder_Counts);
   } else if (!Serial) {
     serialHeaderSent = false;
   }
@@ -380,23 +367,14 @@ void LogData(unsigned long TimeStamp) {
 
 void setup() {
   Serial.begin(115200);
-  Serial1.begin(9600);
+  //Serial1.begin(9600);
+  programStartMillis = millis();
 
-  unsigned long serialWaitStart = millis();
-  while (!Serial && millis() - serialWaitStart < 5000) {
+ while (!Serial) {
     delay(10);
   }
 
-  if (Serial) {
-    Serial.println("Combined logger starting...");
-    Serial.println("USB serial connected at 115200 baud.");
-  }
-
-  //InitializeRTC();
-
-  if (Serial) {
-    Serial.println("RTC Ready");
-  }
+  Serial.println("BOOT OK");
 
   pinMode(ledPin, OUTPUT);
 
@@ -502,10 +480,15 @@ void setup() {
   byte imuWakeCommand[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
   Serial1.write(imuWakeCommand, 5);
 
-  DataFile = SD.open("Rover_Data.csv", FILE_WRITE);
-  if (!DataFile) {
+  char logFilename[16];
+  if (!OpenNextLogFile(logFilename, sizeof(logFilename))) {
     digitalWrite(ledPin, HIGH);
     return;
+  }
+
+  if (Serial) {
+    Serial.print("Logging to: ");
+    Serial.println(logFilename);
   }
 
   PrintLogHeader(DataFile);
