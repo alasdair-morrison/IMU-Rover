@@ -1,8 +1,8 @@
 #include <Wire.h>
 
 void setup() {
-  Wire.begin();
-  Wire.setClock(10000); // Drop from default 100kHz down to 10kHz
+  Wire1.begin();
+  Wire1.setClock(10000); // Drop from default 100kHz down to 10kHz
   Serial.begin(9600);
   while (!Serial);
   Serial.println("\nI2C Scanner started.");
@@ -15,8 +15,8 @@ void loop() {
   Serial.println("Scanning...");
 
   for(address = 1; address < 127; address++ ) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
+    Wire1.beginTransmission(address);
+    error = Wire1.endTransmission();
 
     if (error == 0) {
       Serial.print("I2C device found at address 0x");

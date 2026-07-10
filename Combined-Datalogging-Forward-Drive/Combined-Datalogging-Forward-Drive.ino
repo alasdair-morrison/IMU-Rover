@@ -1,523 +1,382 @@
-#include <Wire.h>
 #include <SPI.h>
 #include <SD.h>
+#include <Wire.h>
 #include <Adafruit_HUSB238.h>
+#include "RTClib.h"
 
+// --- OBJECT INSTANTIATIONS ---
 Adafruit_HUSB238 husb238;
+RTC_PCF8523 rtc;
 File DataFile;
 
-// Motor driver pins
-#define PWM_A 35
-#define in1_A 30
-#define in2_A 31
-#define in1_B 32
-#define in2_B 33
-#define PWM_B 37
+// --- PIN DEFINITIONS ---
+const int chipSelect = 10;
+const int ledPin = 13;
 
-#define PWM_C 39
-#define in1_C 26
-#define in2_C 27
-#define in1_D 28
-#define in2_D 29
-#define PWM_D 41
-
-#define PWM_E 44
-#define in1_E 25
-#define in2_E 24
-#define in1_F 23
-#define in2_F 22
-#define PWM_F 45
-
-// Encoder pins
-#define Wheel_A_Channel_A 1
-#define Wheel_A_Channel_B 2
-#define Wheel_B_Channel_A 3 
-#define Wheel_B_Channel_B 4  
-#define Wheel_C_Channel_A 5  
-#define Wheel_C_Channel_B 6  
-#define Wheel_D_Channel_A 7  
-#define Wheel_D_Channel_B 8  
-#define Wheel_E_Channel_A 9  
-#define Wheel_E_Channel_B 11      // NO PIN 10 HEYA
-#define Wheel_F_Channel_A 12
-#define Wheel_F_Channel_B 13
-
-// IMU UART pins used by the board
-#define tx 18
+#define tx 18 
 #define rx 19
 
-#define MASTER_CLOCK 84000000
+// Encoders (SKIP PIN 10)
+#define whA_B 13 // Wheel A output B
+#define whA_A 12 // Wheel A output A
+#define whB_B 11 // Wheel B output B
+#define whB_A 9 // wheel B output A
+#define whC_B 8 // Wheel C output B
+#define whC_A 7 // wheel C output A
+#define whD_B 6 // wheel D output B
+#define whD_A 5 // wheel D output A
+#define whE_B 4 // wheel E output B
+#define whE_A 3 // wheel E output A
+//No 2 or 1 for serial link functionality
+#define whF_B 15 // wheel F output B 
+#define whF_A 14 // wheel F output A
 
-const int sdChipSelect = 10;
-const int ledPin = 13;
-const unsigned long interval = 10;
-const unsigned long serialMirrorInterval = 100;
-const int forwardDrivePwm = 180;
+#define PWM_A 35 
+#define in1_A 30 
+#define in2_A 31 
+#define in1_B 32 
+#define in2_B 33 
+#define PWM_B 37 
 
-uint32_t pwmClockFrequencyHz = 42000000;
-int motorPwmChannelA = 0;
-int motorPwmChannelB = 1;
-int motorPwmChannelC = 2;
-int motorPwmChannelD = 3;
-int motorPwmChannelE = 5;
-int motorPwmChannelF = 6;
+#define PWM_C 39 
+#define in1_C 26 
+#define in2_C 27 
+#define in1_D 28 
+#define in2_D 29 
+#define PWM_D 41 
 
+#define PWM_E 44 
+#define in1_E 25 
+#define in2_E 24 
+#define in1_F 23 
+#define in2_F 22 
+#define PWM_F 45 
+
+// --- GLOBAL VARIABLES ---
 volatile long counts[6] = {0, 0, 0, 0, 0, 0};
-int MotorPWM[6] = {0, 0, 0, 0, 0, 0};
+float Roll = 0, Pitch = 0, Yaw = 0;
+float Ax = 0, Ay = 0, Az = 0;
+float Gx = 0, Gy = 0, Gz = 0;
 
-unsigned long startTime = 0;
-unsigned long programStartMillis = 0;
-bool started = false;
+char filename[] = "LOG00.CSV";
+
 unsigned long previousMillis = 0;
+const long interval = 10; // 100 Hz Logging
 
-float Roll = 0;
-float Pitch = 0;
-float Yaw = 0;
-float Ax = 0;
-float Ay = 0;
-float Az = 0;
-float Gx = 0;
-float Gy = 0;
-float Gz = 0;
-float supplyVoltage = 9.0;
-bool serialHeaderSent = false;
+#define MASTER_CLOCK 84000000
+uint32_t clock_a = 42000000; 
+int chA = 0, chB = 1, chC = 2, chD = 3, chE = 5, chF = 6;
 
-void FormatElapsedTimestamp(char* buffer, size_t bufferSize, unsigned long elapsedMillis) {
-  snprintf(buffer,
-           bufferSize,
-           "%lu",
-           elapsedMillis);
-}
+// --- ISR ENCODER FUNCTIONS ---
+void ISR_MOTOR_1() { digitalRead(whA_A) == digitalRead(whA_B) ? counts[0]-- : counts[0]++; }
+void ISR_MOTOR_2() { digitalRead(whB_A) == digitalRead(whB_B) ? counts[1]-- : counts[1]++; }
+void ISR_MOTOR_3() { digitalRead(whC_A) == digitalRead(whC_B) ? counts[2]-- : counts[2]++; }
+void ISR_MOTOR_4() { digitalRead(whD_A) == digitalRead(whD_B) ? counts[3]-- : counts[3]++; }
+void ISR_MOTOR_5() { digitalRead(whE_A) == digitalRead(whE_B) ? counts[4]-- : counts[4]++; }
+void ISR_MOTOR_6() { digitalRead(whF_A) == digitalRead(whF_B) ? counts[5]-- : counts[5]++; }
 
-void PrintLogHeader(Print& output) {
-  output.println("Elapsed_ms,Roll,Pitch,Yaw,Ax,Ay,Az,Gx,Gy,Gz,M1_Count,M2_Count,M3_Count,M4_Count,M5_Count,M6_Count,V1_PWM,V2_PWM,V3_PWM,V4_PWM,V5_PWM,V6_PWM,V1_Voltage,V2_Voltage,V3_Voltage,V4_Voltage,V5_Voltage,V6_Voltage");
-}
-
-void PrintLogRow(Print& output, const char* elapsedTimestamp, const long* encoderCounts) {
-  output.print(elapsedTimestamp);
-  output.print(",");
-  output.print(Roll);
-  output.print(",");
-  output.print(Pitch);
-  output.print(",");
-  output.print(Yaw);
-  output.print(",");
-  output.print(Ax);
-  output.print(",");
-  output.print(Ay);
-  output.print(",");
-  output.print(Az);
-  output.print(",");
-  output.print(Gx);
-  output.print(",");
-  output.print(Gy);
-  output.print(",");
-  output.print(Gz);
-  output.print(",");
-
-  for (int i = 0; i < 6; i++) {
-    output.print(encoderCounts[i]);
-    output.print(",");
-  }
-
-  for (int i = 0; i < 6; i++) {
-    output.print(MotorPWM[i]);
-    output.print(",");
-  }
-
-  for (int i = 0; i < 6; i++) {
-    float motorVoltage = (MotorPWM[i] / 255.0) * supplyVoltage;
-    output.print(motorVoltage);
-    if (i < 5) {
-      output.print(",");
-    }
-  }
-
-  output.println();
-}
-
-bool OpenNextLogFile(char* filename, size_t filenameSize) {
-  for (int fileIndex = 0; fileIndex < 100; fileIndex++) {
-    snprintf(filename, filenameSize, "Rover%02d.csv", fileIndex);
-    if (!SD.exists(filename)) {
-      DataFile = SD.open(filename, FILE_WRITE);
-      return DataFile;
-    }
-  }
-
-  return false;
-}
-
-void SetPin(uint8_t pin)
-{
-  PIO_Configure(g_APinDescription[pin].pPort,
-                PIO_PERIPH_B,
-                g_APinDescription[pin].ulPin,
-                g_APinDescription[pin].ulPinConfiguration);
+// --- MOTOR PWM SETUP ---
+void SetPin(uint8_t pin) {
+  PIO_Configure(g_APinDescription[pin].pPort, PIO_PERIPH_B, g_APinDescription[pin].ulPin, g_APinDescription[pin].ulPinConfiguration);
 }
 
 void setPWM(int channel) {
   pmc_enable_periph_clk(PWM_INTERFACE_ID);
-  PWMC_ConfigureClocks(pwmClockFrequencyHz, 0, MASTER_CLOCK);
-  PWMC_ConfigureChannelExt(PWM,
-                           channel,
-                           PWM_CMR_CPRE_CLKA,
-                           0,
-                           0,
-                           0,
-                           PWM_CMR_DTE,
-                           0,
-                           0);
+  PWMC_ConfigureClocks(clock_a, 0, MASTER_CLOCK);
+  PWMC_ConfigureChannelExt(PWM, channel, PWM_CMR_CPRE_CLKA, 0, 0, 0, PWM_CMR_DTE, 0, 0);
   PWMC_SetPeriod(PWM, channel, 1200);
-  PWMC_SetDutyCycle(PWM, channel, 600);
+  PWMC_SetDutyCycle(PWM, channel, 1200);
   PWMC_SetDeadTime(PWM, channel, 42, 42);
   PWMC_EnableChannel(PWM, channel);
 }
 
-void ApplyMotorPWM() {
-  int pwmChannels[6] = {motorPwmChannelA, motorPwmChannelB, motorPwmChannelC, motorPwmChannelD, motorPwmChannelE, motorPwmChannelF};
-  for (int i = 0; i < 6; i++) {
-    int duty = (int)map(MotorPWM[i], 0, 255, 0, 1200);
-    PWMC_SetDutyCycle(PWM, pwmChannels[i], duty);
-  }
+enum RoverState { STATE_FORWARD, STATE_REVERSE, STATE_TURN_LEFT, STATE_TURN_RIGHT, STATE_STOP };
+RoverState currentState = STATE_FORWARD;
+unsigned long stateStartTime = 0;
+bool stateInitialized = false;
+
+// --- MOTOR DRIVER CONTROLS ---
+void forward(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); PWMC_SetDutyCycle(PWM, chB, trueDuty);
+  digitalWrite(in1_A, HIGH); digitalWrite(in2_A, LOW); digitalWrite(in1_B, HIGH); digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); PWMC_SetDutyCycle(PWM, chD, trueDuty);
+  digitalWrite(in1_C, HIGH); digitalWrite(in2_C, LOW); digitalWrite(in1_D, HIGH); digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
+  digitalWrite(in1_E, HIGH); digitalWrite(in2_E, LOW); digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
+  Serial.println("Driving Forwards");
 }
 
-void ISR_MOTOR_1() {
-  if (digitalRead(Wheel_A_Channel_A) == digitalRead(Wheel_A_Channel_B)) {
-    counts[0]--;
-  } else {
-    counts[0]++;
-  }
+void reverse(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); PWMC_SetDutyCycle(PWM, chB, trueDuty);
+  digitalWrite(in1_A, LOW); digitalWrite(in2_A, HIGH); digitalWrite(in1_B, LOW); digitalWrite(in2_B, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); PWMC_SetDutyCycle(PWM, chD, trueDuty);
+  digitalWrite(in1_C, LOW); digitalWrite(in2_C, HIGH); digitalWrite(in1_D, LOW); digitalWrite(in2_D, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
+  digitalWrite(in1_E, LOW); digitalWrite(in2_E, HIGH); digitalWrite(in1_F, LOW); digitalWrite(in2_F, HIGH);
+  Serial.println("Driving in Reverse");
 }
 
-void ISR_MOTOR_2() {
-  if (digitalRead(Wheel_B_Channel_A) == digitalRead(Wheel_B_Channel_B)) {
-    counts[1]--;
-  } else {
-    counts[1]++;
-  }
+void turnRight(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); PWMC_SetDutyCycle(PWM, chB, trueDuty);
+  digitalWrite(in1_A, LOW); digitalWrite(in2_A, HIGH); digitalWrite(in1_B, HIGH); digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); PWMC_SetDutyCycle(PWM, chD, trueDuty);
+  digitalWrite(in1_C, LOW); digitalWrite(in2_C, HIGH); digitalWrite(in1_D, HIGH); digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
+  digitalWrite(in1_E, LOW); digitalWrite(in2_E, HIGH); digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
+  Serial.println("Turning Right");
 }
 
-void ISR_MOTOR_3() {
-  if (digitalRead(Wheel_C_Channel_A) == digitalRead(Wheel_C_Channel_B)) {
-    counts[2]--;
-  } else {
-    counts[2]++;
-  }
+void turnLeft(float duty) {
+  int trueDuty = 1200 - int(1200 * duty);
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); PWMC_SetDutyCycle(PWM, chB, trueDuty);
+  digitalWrite(in1_A, HIGH); digitalWrite(in2_A, LOW); digitalWrite(in1_B, LOW); digitalWrite(in2_B, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); PWMC_SetDutyCycle(PWM, chD, trueDuty);
+  digitalWrite(in1_C, HIGH); digitalWrite(in2_C, LOW); digitalWrite(in1_D, LOW); digitalWrite(in2_D, HIGH);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
+  digitalWrite(in1_E, HIGH); digitalWrite(in2_E, LOW); digitalWrite(in1_F, LOW); digitalWrite(in2_F, HIGH);
+  Serial.println("Turning Left");
 }
 
-void ISR_MOTOR_4() {
-  if (digitalRead(Wheel_D_Channel_A) == digitalRead(Wheel_D_Channel_B)) {
-    counts[3]--;
-  } else {
-    counts[3]++;
-  }
+void stop() {
+  int trueDuty = 1200;
+  PWMC_SetDutyCycle(PWM, chA, trueDuty); PWMC_SetDutyCycle(PWM, chB, trueDuty);
+  digitalWrite(in1_A, HIGH); digitalWrite(in2_A, LOW); digitalWrite(in1_B, HIGH); digitalWrite(in2_B, LOW);
+
+  PWMC_SetDutyCycle(PWM, chC, trueDuty); PWMC_SetDutyCycle(PWM, chD, trueDuty);
+  digitalWrite(in1_C, HIGH); digitalWrite(in2_C, LOW); digitalWrite(in1_D, HIGH); digitalWrite(in2_D, LOW);
+
+  PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
+  digitalWrite(in1_E, HIGH); digitalWrite(in2_E, LOW); digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
+  Serial.println("Stopping");
 }
 
-void ISR_MOTOR_5() {
-  if (digitalRead(Wheel_E_Channel_A) == digitalRead(Wheel_E_Channel_B)) {
-    counts[4]--;
-  } else {
-    counts[4]++;
-  }
-}
-
-void ISR_MOTOR_6() {
-  if (digitalRead(Wheel_F_Channel_A) == digitalRead(Wheel_F_Channel_B)) {
-    counts[5]--;
-  } else {
-    counts[5]++;
-  }
-}
-
-void ReadIMU() {
-  if (Serial1.available() >= 11) {
-    if (Serial1.read() != 0x55) {
-      return;
-    }
-
-    byte type = Serial1.read();
-    int16_t rRaw = (Serial1.read() | (Serial1.read() << 8));
-    int16_t pRaw = (Serial1.read() | (Serial1.read() << 8));
-    int16_t yRaw = (Serial1.read() | (Serial1.read() << 8));
-
-    for (int i = 0; i < 3; i++) {
-      Serial1.read();
-    }
-
-    if (type == 0x51) {
-      Ax = (float)rRaw / 32768.0 * 16.0;
-      Ay = (float)pRaw / 32768.0 * 16.0;
-      Az = (float)yRaw / 32768.0 * 16.0;
-    } else if (type == 0x52) {
-      Gx = (float)rRaw / 32768.0 * 2000.0;
-      Gy = (float)pRaw / 32768.0 * 2000.0;
-      Gz = (float)yRaw / 32768.0 * 2000.0;
-    } else if (type == 0x53) {
-      Roll = (float)rRaw / 32768.0 * 180.0;
-      Pitch = (float)pRaw / 32768.0 * 180.0;
-      Yaw = (float)yRaw / 32768.0 * 180.0;
-    }
-
-    if (abs(Roll) > 180 || abs(Pitch) > 180 || abs(Yaw) > 180) {
-      return;
-    }
-  }
-}
-
-void EnsureMotorPower() {
-  HUSB238_VoltageSetting currentVoltage = husb238.getPDSrcVoltage();
-  if (currentVoltage != PD_9V) {
-    husb238.selectPD(PD_SRC_9V);
-    husb238.requestPD();
-    delay(200);
-    supplyVoltage = 9.0;
-  }
-}
-
-void LogData(unsigned long TimeStamp) {
-  long Safe_Encoder_Counts[6];
-  char elapsedTimestamp[32];
-  unsigned long elapsedMillis = TimeStamp - programStartMillis;
-  FormatElapsedTimestamp(elapsedTimestamp, sizeof(elapsedTimestamp), elapsedMillis);
-
-  noInterrupts();
-  for (int i = 0; i < 6; i++) {
-    Safe_Encoder_Counts[i] = counts[i];
-  }
-  interrupts();
-
-  if (DataFile) {
-    digitalWrite(ledPin, HIGH);
-    PrintLogRow(DataFile, elapsedTimestamp, Safe_Encoder_Counts);
-    digitalWrite(ledPin, LOW);
-  }
-
-  static unsigned long lastSerialRowPrint = 0;
-  if (Serial && TimeStamp - lastSerialRowPrint >= serialMirrorInterval) {
-    lastSerialRowPrint = TimeStamp;
-    if (!serialHeaderSent) {
-      PrintLogHeader(Serial);
-      serialHeaderSent = true;
-    }
-    PrintLogRow(Serial, elapsedTimestamp, Safe_Encoder_Counts);
-  } else if (!Serial) {
-    serialHeaderSent = false;
-  }
-
-  static unsigned long lastClose = 0;
-  if (TimeStamp - lastClose >= 1000) {
-    if (DataFile) {
-      DataFile.flush();
-    }
-    lastClose = TimeStamp;
-  }
-
-  static unsigned long lastDebugPrint = 0;
-  if (TimeStamp - lastDebugPrint >= 1000) {
-    lastDebugPrint = TimeStamp;
-    Serial.println();
-    Serial.print("   Time [ms]:  ");
-    Serial.print(TimeStamp);
-    Serial.println();
-
-    Serial.print("  Encoder Counts:  ");
-    Serial.print("   A: ");
-    Serial.print(Safe_Encoder_Counts[0]);
-    Serial.print("   |    B: ");
-    Serial.print(Safe_Encoder_Counts[1]);
-    Serial.print("   |   C: ");
-    Serial.print(Safe_Encoder_Counts[2]);
-    Serial.print("   |   D: ");
-    Serial.print(Safe_Encoder_Counts[3]);
-    Serial.print("   |   E: ");
-    Serial.print(Safe_Encoder_Counts[4]);
-    Serial.print("   |   F: ");
-    Serial.print(Safe_Encoder_Counts[5]);
-    Serial.println();
-
-    Serial.print("  IMU Euler Angles:  ");
-    Serial.print(" R: ");
-    Serial.print(Roll);
-    Serial.print("   |    P: ");
-    Serial.print(Pitch);
-    Serial.print("   |   Y: ");
-    Serial.print(Yaw);
-    Serial.println();
-
-    Serial.print("  Linear Accel:  ");
-    Serial.print("   Ax: ");
-    Serial.print(Ax);
-    Serial.print("   Ay: ");
-    Serial.print(Ay);
-    Serial.print("   Az: ");
-    Serial.print(Az);
-    Serial.println();
-
-    Serial.print("  Gyro:  ");
-    Serial.print("             Gx: ");
-    Serial.print(Gx);
-    Serial.print("   Gy: ");
-    Serial.print(Gy);
-    Serial.print("   Gz: ");
-    Serial.print(Gz);
-    Serial.println();
-  }
-}
-
+// --- SETUP ---
 void setup() {
   Serial.begin(115200);
-  //Serial1.begin(9600);
-  programStartMillis = millis();
-
- while (!Serial) {
-    delay(10);
-  }
-
-  Serial.println("BOOT OK");
-
+  while (!Serial) delay(10); 
+  
+  Serial.println("=== SYSTEM BOOT INITIATED ===");
   pinMode(ledPin, OUTPUT);
 
-  pinMode(Wheel_A_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_A_Channel_B, INPUT_PULLUP);
-  pinMode(Wheel_B_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_B_Channel_B, INPUT_PULLUP);
-  pinMode(Wheel_C_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_C_Channel_B, INPUT_PULLUP);
-  pinMode(Wheel_D_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_D_Channel_B, INPUT_PULLUP);
-  pinMode(Wheel_E_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_E_Channel_B, INPUT_PULLUP);
-  pinMode(Wheel_F_Channel_A, INPUT_PULLUP);
-  pinMode(Wheel_F_Channel_B, INPUT_PULLUP);
-
-  if (Serial) {
-    Serial.println("encoder pins setup");
-  }
-
-  attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_A), ISR_MOTOR_1, RISING);
-  attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_A), ISR_MOTOR_2, RISING);
-  attachInterrupt(digitalPinToInterrupt(Wheel_C_Channel_A), ISR_MOTOR_3, RISING);
-  attachInterrupt(digitalPinToInterrupt(Wheel_D_Channel_A), ISR_MOTOR_4, RISING);
-  attachInterrupt(digitalPinToInterrupt(Wheel_E_Channel_A), ISR_MOTOR_5, RISING);
-  attachInterrupt(digitalPinToInterrupt(Wheel_F_Channel_A), ISR_MOTOR_6, RISING);
-
-  if (Serial) {
-    Serial.println("encoder interrupts ready");
-  }
-
-  pinMode(in1_A, OUTPUT);
-  pinMode(in2_A, OUTPUT);
-  pinMode(in1_B, OUTPUT);
-  pinMode(in2_B, OUTPUT);
-  pinMode(in1_C, OUTPUT);
-  pinMode(in2_C, OUTPUT);
-  pinMode(in1_D, OUTPUT);
-  pinMode(in2_D, OUTPUT);
-  pinMode(in1_E, OUTPUT);
-  pinMode(in2_E, OUTPUT);
-  pinMode(in1_F, OUTPUT);
-  pinMode(in2_F, OUTPUT);
-
-  digitalWrite(in1_A, HIGH);
-  digitalWrite(in2_A, LOW);
-  digitalWrite(in1_B, HIGH);
-  digitalWrite(in2_B, LOW);
-  digitalWrite(in1_C, HIGH);
-  digitalWrite(in2_C, LOW);
-  digitalWrite(in1_D, HIGH);
-  digitalWrite(in2_D, LOW);
-  digitalWrite(in1_E, HIGH);
-  digitalWrite(in2_E, LOW);
-  digitalWrite(in1_F, HIGH);
-  digitalWrite(in2_F, LOW);
-
-  SetPin(PWM_A);
-  SetPin(PWM_B);
-  SetPin(PWM_C);
-  SetPin(PWM_D);
-  SetPin(PWM_E);
-  SetPin(PWM_F);
-
-  setPWM(motorPwmChannelA);
-  setPWM(motorPwmChannelB);
-  setPWM(motorPwmChannelC);
-  setPWM(motorPwmChannelD);
-  setPWM(motorPwmChannelE);
-  setPWM(motorPwmChannelF);
-
-  if (Serial) {
-    Serial.println("movement pins setup");
-  }
-
+  Serial.print("Initializing HUSB238 PD Controller... ");
   if (!husb238.begin(HUSB238_I2CADDR_DEFAULT, &Wire)) {
-    Serial.println("HUSB238 Init Failed. Check wiring.");
-    while (1) {
-      delay(10);
-    }
+    Serial.println("FAILED.");
+    while (1) { digitalWrite(ledPin, HIGH); delay(100); digitalWrite(ledPin, LOW); delay(100); }
   }
   husb238.selectPD(PD_SRC_9V);
   husb238.requestPD();
   delay(500);
+  Serial.println("SUCCESS");
 
-  if (Serial) {
-    Serial.println("Power and drive systems configured");
+  Serial.print("Initializing PCF8523 RTC on Wire1... ");
+  if (!rtc.begin(&Wire1)) {
+    Serial.println("FAILED.");
+    while (1) { digitalWrite(ledPin, HIGH); delay(250); digitalWrite(ledPin, LOW); delay(250); }
   }
+  if (!rtc.initialized() || rtc.lostPower()) {
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+  Serial.println("SUCCESS");
 
-  if (!SD.begin(sdChipSelect)) {
-    while (1) {
-      digitalWrite(ledPin, HIGH);
-      delay(100);
-      digitalWrite(ledPin, LOW);
-      delay(100);
+  // 3. SD Card Initialization
+  Serial.print("Initializing SD Card on Pin 10... ");
+  if (!SD.begin(chipSelect)) {
+    Serial.println("FAILED. Check SD Card insertion and SPI wiring.");
+    while (1) { digitalWrite(ledPin, HIGH); delay(500); digitalWrite(ledPin, LOW); delay(500); }
+  }
+  Serial.println("SUCCESS");
+
+  // --- NEW: Generate Unique Filename ---
+  // Loop through numbers 0 to 99 to find the first unused filename
+  for (uint8_t i = 0; i < 100; i++) {
+    filename[3] = i / 10 + '0'; // Tens digit
+    filename[4] = i % 10 + '0'; // Ones digit
+    
+    if (!SD.exists(filename)) {
+      // If the file does NOT exist, we found a free name!
+      break; 
     }
   }
 
-  if (Serial) {
-    Serial.println("sd card setup complete");
+  Serial.print("Logging data to new file: ");
+  Serial.println(filename);
+
+  // Define the header once
+  String csvHeader = "Timestamp, Roll, Pitch, Yaw, Ax, Ay, Az, Gx, Gy, Gz, Wh_A, Wh_B, Wh_C, Wh_D, Wh_E, Wh_F";
+
+  // Create the new file and write the header
+  DataFile = SD.open(filename, FILE_WRITE);
+  if (DataFile) {
+    DataFile.println(csvHeader);
+    DataFile.flush();
+    Serial.println("CSV Header written successfully.");
+  } else {
+    Serial.println("FAILED to open the new CSV file.");
   }
 
-  byte imuWakeCommand[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};
-  Serial1.write(imuWakeCommand, 5);
+  // Print the exact same header to the Serial Monitor
+  Serial.println(csvHeader);
 
-  char logFilename[16];
-  if (!OpenNextLogFile(logFilename, sizeof(logFilename))) {
-    digitalWrite(ledPin, HIGH);
-    return;
-  }
+  Serial1.begin(9600); 
+  byte imuInitCommand[] = {0xFF, 0xAA, 0x03, 0x03, 0x00};                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+  Serial1.write(imuInitCommand, 5);
+  Serial.println("IMU Configured");
 
-  if (Serial) {
-    Serial.print("Logging to: ");
-    Serial.println(logFilename);
-  }
+  pinMode(whA_A, INPUT_PULLUP); pinMode(whA_B, INPUT_PULLUP);    
+  pinMode(whB_A, INPUT_PULLUP); pinMode(whB_B, INPUT_PULLUP);    
+  pinMode(whC_A, INPUT_PULLUP); pinMode(whC_B, INPUT_PULLUP);    
+  pinMode(whD_A, INPUT_PULLUP); pinMode(whD_B, INPUT_PULLUP);    
+  pinMode(whE_A, INPUT_PULLUP); pinMode(whE_B, INPUT_PULLUP);    
+  pinMode(whF_A, INPUT_PULLUP); pinMode(whF_B, INPUT_PULLUP);  
 
-  PrintLogHeader(DataFile);
+  attachInterrupt(digitalPinToInterrupt(whA_A), ISR_MOTOR_1, CHANGE); 
+  attachInterrupt(digitalPinToInterrupt(whB_A), ISR_MOTOR_2, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(whC_A), ISR_MOTOR_3, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(whD_A), ISR_MOTOR_4, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(whE_A), ISR_MOTOR_5, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(whF_A), ISR_MOTOR_6, CHANGE);
 
-  if (Serial) {
-    PrintLogHeader(Serial);
-    serialHeaderSent = true;
-  }
+  pinMode(in1_A, OUTPUT); pinMode(in2_A, OUTPUT);
+  pinMode(in1_B, OUTPUT); pinMode(in2_B, OUTPUT);
+  pinMode(in1_C, OUTPUT); pinMode(in2_C, OUTPUT);
+  pinMode(in1_D, OUTPUT); pinMode(in2_D, OUTPUT);
+  pinMode(in1_E, OUTPUT); pinMode(in2_E, OUTPUT);
+  pinMode(in1_F, OUTPUT); pinMode(in2_F, OUTPUT);
+
+  SetPin(PWM_A); SetPin(PWM_B); SetPin(PWM_C); SetPin(PWM_D); SetPin(PWM_E); SetPin(PWM_F);
+  setPWM(chA); setPWM(chB); setPWM(chC); setPWM(chD); setPWM(chE); setPWM(chF);
+  
+  Serial.println("=== SYSTEM BOOT COMPLETE ===");
 }
 
+// --- MAIN LOOP ---
 void loop() {
   unsigned long currentMillis = millis();
 
-  if (!started) {
-    startTime = currentMillis;
-    started = true;
+  // Initialize the timer on the very first loop
+  if (!stateInitialized) {
+    stateStartTime = currentMillis;
+    stateInitialized = true;
+    forward(0.75); // Start the first movement
   }
 
-  EnsureMotorPower();
-
-  for (int i = 0; i < 6; i++) {
-    MotorPWM[i] = forwardDrivePwm;
+  if (husb238.getPDSrcVoltage() != PD_9V) {
+    husb238.selectPD(PD_SRC_9V);
+    husb238.requestPD();
   }
 
-  ApplyMotorPWM();
-  ReadIMU();
+  switch (currentState) {
+    case STATE_FORWARD:
+      if (currentMillis - stateStartTime >= 5000) { // After 5 seconds
+        reverse(0.75);
+        currentState = STATE_REVERSE;  // Set currentState to the next desired state
+        stateStartTime = currentMillis; // Reset timer for the new state
+      }
+      break;
+      
+    case STATE_REVERSE:
+      if (currentMillis - stateStartTime >= 5000) {
+        turnLeft(0.75);
+        currentState = STATE_TURN_LEFT;
+        stateStartTime = currentMillis;
+      }
+      break;
+
+    case STATE_TURN_LEFT:
+      if (currentMillis - stateStartTime >= 5000) {
+        turnRight(0.75);
+        currentState = STATE_TURN_RIGHT;
+        stateStartTime = currentMillis;
+      }
+      break;
+
+    case STATE_TURN_RIGHT:
+      if (currentMillis - stateStartTime >= 5000) {
+        stop();
+        currentState = STATE_STOP;
+        stateStartTime = currentMillis;
+      }
+      break;
+
+    case STATE_STOP:
+      // Rover stays stopped indefinitely
+      break;
+  }
+
+  ReadIMU();    
 
   if (currentMillis - previousMillis >= interval) {
     previousMillis += interval;
-    LogData(currentMillis);
+    LogData();
+  }
+}
+
+// --- IMU PARSING ---
+void ReadIMU() {
+  if (Serial1.available() < 11) return;
+  if (Serial1.read() != 0x55) return; 
+  
+  byte type = Serial1.read();
+  int16_t rRaw = (Serial1.read() | (Serial1.read() << 8));
+  int16_t pRaw = (Serial1.read() | (Serial1.read() << 8));
+  int16_t yRaw = (Serial1.read() | (Serial1.read() << 8)); 
+  for(int i=0; i<3; i++) Serial1.read(); 
+
+  if (type == 0x51) {                     
+    Ax = (float)rRaw / 32768.0 * 16.0; Ay = (float)pRaw / 32768.0 * 16.0; Az = (float)yRaw / 32768.0 * 16.0;      
+  } else if (type == 0x52) {                 
+    Gx = (float)rRaw / 32768.0 * 2000.0; Gy = (float)pRaw / 32768.0 * 2000.0; Gz = (float)yRaw / 32768.0 * 2000.0;  
+  } else if (type == 0x53) {                 
+    Roll = (float)rRaw / 32768.0 * 180.0; Pitch = (float)pRaw / 32768.0 * 180.0; Yaw = (float)yRaw / 32768.0 * 180.0;
+  }
+}
+
+// --- DATA LOGGING & OUTPUT ---
+void LogData() {
+  DateTime now = rtc.now();
+  char timeBuffer[20];
+  sprintf(timeBuffer, "%04d/%02d/%02d %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+
+  long Safe_Encoder_Counts[6];
+  noInterrupts();
+  for(int i = 0; i < 6; i++) { Safe_Encoder_Counts[i] = counts[i]; }
+  interrupts();
+
+  String dataString = String(timeBuffer) + "," + 
+                      String(Roll, 2) + "," + String(Pitch, 2) + "," + String(Yaw, 2) + "," + 
+                      String(Ax, 2) + "," + String(Ay, 2) + "," + String(Az, 2) + "," + 
+                      String(Gx, 2) + "," + String(Gy, 2) + "," + String(Gz, 2) + "," + 
+                      String(Safe_Encoder_Counts[0]) + "," + String(Safe_Encoder_Counts[1]) + "," + 
+                      String(Safe_Encoder_Counts[2]) + "," + String(Safe_Encoder_Counts[3]) + "," + 
+                      String(Safe_Encoder_Counts[4]) + "," + String(Safe_Encoder_Counts[5]);
+
+  if (DataFile) {
+    digitalWrite(ledPin, HIGH);
+    DataFile.println(dataString);
+    digitalWrite(ledPin, LOW);
+  }
+
+  static int serialLogCounter = 0;
+  serialLogCounter++;
+  if(serialLogCounter >= 50) {
+    serialLogCounter = 0;
+    Serial.println(dataString);
+  }
+
+  static unsigned long lastClose = 0;
+  if (millis() - lastClose >= 1000) {  
+    if (DataFile) DataFile.flush();  
+    lastClose = millis();
   }
 }
