@@ -17,19 +17,19 @@ const int ledPin = 13;
 #define rx 19
 
 // Encoders (SKIP PIN 10)
-#define whA_B 13 // Wheel A output B
-#define whA_A 12 // Wheel A output A
-#define whB_B 11 // Wheel B output B
-#define whB_A 9 // wheel B output A
-#define whC_B 8 // Wheel C output B
-#define whC_A 7 // wheel C output A
-#define whD_B 6 // wheel D output B
-#define whD_A 5 // wheel D output A
-#define whE_B 4 // wheel E output B
-#define whE_A 3 // wheel E output A
+#define whA_A 13 // Wheel A output B
+#define whA_B 12 // Wheel A output A
+#define whB_A 11 // Wheel B output B
+#define whB_B 9 // wheel B output A
+#define whC_A 8 // Wheel C output B
+#define whC_B 7 // wheel C output A
+#define whD_A 6 // wheel D output B
+#define whD_B 5 // wheel D output A
+#define whE_A 4 // wheel E output B
+#define whE_B 3 // wheel E output A
 //No 2 or 1 for serial link functionality
-#define whF_B 15 // wheel F output B 
-#define whF_A 14 // wheel F output A
+#define whF_A 14 // wheel F output B 
+#define whF_B 15 // wheel F output A
 
 #define PWM_A 35 
 #define in1_A 30 
@@ -66,6 +66,12 @@ const long interval = 10; // 100 Hz Logging
 #define MASTER_CLOCK 84000000
 uint32_t clock_a = 42000000; 
 int chA = 0, chB = 1, chC = 2, chD = 3, chE = 5, chF = 6;
+
+// Smoothing factor (alpha). 0.0 to 1.0. 
+// Lower values = more smoothing (slower response), 
+// Higher values = less smoothing (faster response)
+float alpha = 0.2; 
+float filteredEncoderCounts[6] = {0, 0, 0, 0, 0, 0};
 
 // --- ISR ENCODER FUNCTIONS ---
 void ISR_MOTOR_1() { digitalRead(whA_A) == digitalRead(whA_B) ? counts[0]-- : counts[0]++; }
@@ -353,13 +359,34 @@ void LogData() {
   for(int i = 0; i < 6; i++) { Safe_Encoder_Counts[i] = counts[i]; }
   interrupts();
 
+  long raw_counts[6];
+  noInterrupts();
+  for(int i = 0; i < 6; i++) { raw_counts[i] = counts[i]; }
+  interrupts();
+
+  // Apply EMA filter
+  for(int i = 0; i < 6; i++) {
+    filteredEncoderCounts[i] = (alpha * (float)raw_counts[i]) + ((1.0 - alpha) * filteredEncoderCounts[i]);
+  }
+
+  // Use 'filteredEncoderCounts' in your dataString instead of raw counts
   String dataString = String(timeBuffer) + "," + 
+                      // ... (Roll, Pitch, Yaw, Ax, Ay, Az, Gx, Gy, Gz) ...
                       String(Roll, 2) + "," + String(Pitch, 2) + "," + String(Yaw, 2) + "," + 
                       String(Ax, 2) + "," + String(Ay, 2) + "," + String(Az, 2) + "," + 
-                      String(Gx, 2) + "," + String(Gy, 2) + "," + String(Gz, 2) + "," + 
+                      String(Gx, 2) + "," + String(Gy, 2) + "," + String(Gz, 2) +
+                      "," + String(filteredEncoderCounts[0]) + 
+                      "," + String(filteredEncoderCounts[1]) + 
+                      "," + String(filteredEncoderCounts[2]) + 
+                      "," + String(filteredEncoderCounts[3]) + 
+                      "," + String(filteredEncoderCounts[4]) + 
+                      "," + String(filteredEncoderCounts[5]);
+
+  /*String dataString = String(timeBuffer) + "," + 
+                       "," + 
                       String(Safe_Encoder_Counts[0]) + "," + String(Safe_Encoder_Counts[1]) + "," + 
                       String(Safe_Encoder_Counts[2]) + "," + String(Safe_Encoder_Counts[3]) + "," + 
-                      String(Safe_Encoder_Counts[4]) + "," + String(Safe_Encoder_Counts[5]);
+                      String(Safe_Encoder_Counts[4]) + "," + String(Safe_Encoder_Counts[5]);*/
 
   if (DataFile) {
     digitalWrite(ledPin, HIGH);
