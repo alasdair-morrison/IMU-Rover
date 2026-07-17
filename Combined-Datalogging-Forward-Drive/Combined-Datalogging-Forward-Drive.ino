@@ -17,9 +17,9 @@ const int ledPin = 13;
 #define rx 19
 
 // Encoders (SKIP PIN 10)
-#define whA_A 13 // Wheel A output A
-#define whA_B 12 // Wheel A output B
-#define whB_A 11 // Wheel B output A
+#define whA_A 53 // Wheel A output A
+#define whA_B 52 // Wheel A output B
+#define whB_A 51 // Wheel B output A
 #define whB_B 9 // wheel B output B
 #define whC_A 8 // Wheel C output A
 #define whC_B 7 // wheel C output B
@@ -197,6 +197,8 @@ void setup() {
 
   // 3. SD Card Initialization
   Serial.print("Initializing SD Card on Pin 10... ");
+  pinMode(chipSelect, OUTPUT);
+  digitalWrite(chipSelect, HIGH); // Ensure the card starts deselected
   if (!SD.begin(chipSelect)) {
     Serial.println("FAILED. Check SD Card insertion and SPI wiring.");
     while (1) { digitalWrite(ledPin, HIGH); delay(500); digitalWrite(ledPin, LOW); delay(500); }
