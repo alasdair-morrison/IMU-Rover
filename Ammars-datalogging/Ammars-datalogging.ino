@@ -2,23 +2,50 @@
 #include <SD.h>  // SD card library
 File DataFile; // global file object so all functions can write to it
 
-// ENCODER PINS ;0
-#define Wheel_A_Channel_A 52
-#define Wheel_A_Channel_B 53
-#define Wheel_B_Channel_A 50
-#define Wheel_B_Channel_B 51
-#define Wheel_C_Channel_A 48  
-#define Wheel_C_Channel_B 49
-#define Wheel_D_Channel_A 46 
-#define Wheel_D_Channel_B 47  
-#define Wheel_E_Channel_A 44 
-#define Wheel_E_Channel_B 45      // NO PIN 10 HEYA
-#define Wheel_F_Channel_A 42
-#define Wheel_F_Channel_B 43
+// Encoders (SKIP PIN 10)
+#define whA_A 13 // Wheel A output B
+#define whA_B 12 // Wheel A output A
+#define whB_A 11 // Wheel B output B
+#define whB_B 9 // wheel B output A
+#define whC_A 8 // Wheel C output B
+#define whC_B 7 // wheel C output A
+#define whD_A 6 // wheel D output B
+#define whD_B 5 // wheel D output A
+#define whE_A 4 // wheel E output B
+#define whE_B 3 // wheel E output A
+//No 2 or 1 for serial link functionality
+#define whF_A 14 // wheel F output B 
+#define whF_B 15 // wheel F output A
+
+#define PWM_A 35 
+#define in1_A 30 
+#define in2_A 31 
+#define in1_B 32 
+#define in2_B 33 
+#define PWM_B 37 
+
+#define PWM_C 39 
+#define in1_C 26 
+#define in2_C 27 
+#define in1_D 28 
+#define in2_D 29 
+#define PWM_D 41 
+
+#define PWM_E 44 
+#define in1_E 25 
+#define in2_E 24 
+#define in1_F 23 
+#define in2_F 22 
+#define PWM_F 45 
 
 // IMU PINS ;)
 #define tx 18
 #define rx 19
+
+
+int chA = 0, chB = 1, chC = 2, chD = 3, chE = 5, chF = 6;
+
+
 
 // 1 XD: ENCODER HAKI (6 MOTORS)
 // use volatile so brain processor sees every tiny movement instantly by checking the pins hardware since physcial changes happen
@@ -61,42 +88,42 @@ void UPDATE_ENCODER(int i, int pinA, int pinB){
 
 // Interrupt ISR Functions so it makes it count pulses at lightfoot speed mode , //Each encoder signal connected to a pin, These pins will trigger interrupts
 void ISR_MOTOR_1() {   // i'm measuring position (pulse accumulation)
-  if (digitalRead(Wheel_A_Channel_A) == digitalRead(Wheel_A_Channel_B)){
+  if (digitalRead(whA_A) == digitalRead(whA_B)){
     counts[0]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[0]++;
   }
 }
 void ISR_MOTOR_2() {
-  if (digitalRead(Wheel_B_Channel_A) == digitalRead(Wheel_B_Channel_B)){
+  if (digitalRead(whB_A) == digitalRead(whB_B)){
     counts[1]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[1]++;
   }
 }
 void ISR_MOTOR_3() {
-  if (digitalRead(Wheel_C_Channel_A) == digitalRead(Wheel_C_Channel_B)){
+  if (digitalRead(whC_A) == digitalRead(whC_B)){
     counts[2]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[2]++;
   }
 }
 void ISR_MOTOR_4() {
-  if (digitalRead(Wheel_D_Channel_A) == digitalRead(Wheel_D_Channel_B)){
+  if (digitalRead(whD_A) == digitalRead(whD_B)){
     counts[3]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[3]++;
   }
 }
 void ISR_MOTOR_5() {
-  if (digitalRead(Wheel_E_Channel_A) == digitalRead(Wheel_E_Channel_B)){
+  if (digitalRead(whE_A) == digitalRead(whE_B)){
     counts[4]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[4]++;
   }
 }
 void ISR_MOTOR_6() {
-  if (digitalRead(Wheel_F_Channel_A) == digitalRead(Wheel_F_Channel_B)){
+  if (digitalRead(whF_A) == digitalRead(whF_B)){
     counts[5]--; //Each ISR runs when encoder signal changes, Every trigger = +1 count
   } else {
     counts[5]++;
@@ -160,24 +187,24 @@ void setPWM(int channel) {
 
 
 void setup(){
-    Serial.begin(9600);  // Laptop BAUD RATE
+    Serial.begin(115200);  // Laptop BAUD RATE
     Serial1.begin(9600); // IMU (WT901C)
     // LED setup
     pinMode(ledPin, OUTPUT);
 
     // Initialise Encoders with pullups + Sets pins as inputs, Enables internal pull-up resistors, Prevents floating signals
-    pinMode(Wheel_A_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_A_Channel_B, INPUT_PULLUP);    
-    pinMode(Wheel_B_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_B_Channel_B, INPUT_PULLUP);    
-    pinMode(Wheel_C_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_C_Channel_B, INPUT_PULLUP);    
-    pinMode(Wheel_D_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_D_Channel_B, INPUT_PULLUP);    
-    pinMode(Wheel_E_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_E_Channel_B, INPUT_PULLUP);    
-    pinMode(Wheel_F_Channel_A, INPUT_PULLUP);    
-    pinMode(Wheel_F_Channel_B, INPUT_PULLUP);    
+    pinMode(whA_A, INPUT_PULLUP);    
+    pinMode(whA_B, INPUT_PULLUP);    
+    pinMode(whB_A, INPUT_PULLUP);    
+    pinMode(whB_B, INPUT_PULLUP);    
+    pinMode(whC_A, INPUT_PULLUP);    
+    pinMode(whC_B, INPUT_PULLUP);    
+    pinMode(whD_A, INPUT_PULLUP);    
+    pinMode(whD_B, INPUT_PULLUP);    
+    pinMode(whE_A, INPUT_PULLUP);    
+    pinMode(whE_B, INPUT_PULLUP);    
+    pinMode(whF_A, INPUT_PULLUP);    
+    pinMode(whF_B, INPUT_PULLUP);    
 
 
 
@@ -193,12 +220,12 @@ void setup(){
 
     
     //Links pin to ISR, NOT ANYMORE EVERY RISING = RUN ISR BABYYY // NOW ITS CHANGE (rising + fall)IS doubling resolution  BUT increasing noise sensitivity
-    attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_A), ISR_MOTOR_1, CHANGE); 
-    attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_A), ISR_MOTOR_2, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(Wheel_C_Channel_A), ISR_MOTOR_3, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(Wheel_D_Channel_A), ISR_MOTOR_4, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(Wheel_E_Channel_A), ISR_MOTOR_5, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(Wheel_F_Channel_A), ISR_MOTOR_6, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(whA_A), ISR_MOTOR_1, CHANGE); 
+    attachInterrupt(digitalPinToInterrupt(whB_A), ISR_MOTOR_2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(whC_A), ISR_MOTOR_3, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(whD_A), ISR_MOTOR_4, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(whE_A), ISR_MOTOR_5, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(whF_A), ISR_MOTOR_6, CHANGE);
     /*// ADD CHANNEL B FOR FULLL QUADRATURE BABYYY!! ACCURACY 10 BILLION PERCENT!!
     attachInterrupt(digitalPinToInterrupt(Wheel_A_Channel_B), ISR_MOTOR_1, CHANGE); 
     attachInterrupt(digitalPinToInterrupt(Wheel_B_Channel_B), ISR_MOTOR_2, CHANGE);
@@ -252,20 +279,8 @@ else{
   }
 }   */
  // ENABLES PWM OUTPUT
-SetPin(35);  // channel 0 -  MOTOR A EN
-SetPin(37);  // channel 1   B
-SetPin(39);  // channel 2   C
-SetPin(41);  // channel 3   D
-SetPin(34);  // channel 5   E  
-SetPin(36);  // channel 6   F
- 
-   
-    setPWM(0);
-    setPWM(1);
-    setPWM(2);
-    setPWM(3);
-    setPWM(5);
-    setPWM(6);
+  SetPin(PWM_A); SetPin(PWM_B); SetPin(PWM_C); SetPin(PWM_D); SetPin(PWM_E); SetPin(PWM_F);
+  setPWM(chA); setPWM(chB); setPWM(chC); setPWM(chD); setPWM(chE); setPWM(chF);
  
     // Initialise SD card
     if(!SD.begin(chipselect)){

@@ -17,19 +17,19 @@ const int ledPin = 13;
 #define rx 19
 
 // Encoders (SKIP PIN 10)
-#define whA_A 13 // Wheel A output B
-#define whA_B 12 // Wheel A output A
-#define whB_A 11 // Wheel B output B
-#define whB_B 9 // wheel B output A
-#define whC_A 8 // Wheel C output B
-#define whC_B 7 // wheel C output A
-#define whD_A 6 // wheel D output B
-#define whD_B 5 // wheel D output A
-#define whE_A 4 // wheel E output B
-#define whE_B 3 // wheel E output A
+#define whA_A 13 // Wheel A output A
+#define whA_B 12 // Wheel A output B
+#define whB_A 11 // Wheel B output A
+#define whB_B 9 // wheel B output B
+#define whC_A 8 // Wheel C output A
+#define whC_B 7 // wheel C output B
+#define whD_A 6 // wheel D output A
+#define whD_B 5 // wheel D output B
+#define whE_A 4 // wheel E output A
+#define whE_B 3 // wheel E output B
 //No 2 or 1 for serial link functionality
-#define whF_A 14 // wheel F output B 
-#define whF_B 15 // wheel F output A
+#define whF_A 14 // wheel F output A
+#define whF_B 15 // wheel F output B
 
 #define PWM_A 35 
 #define in1_A 30 
