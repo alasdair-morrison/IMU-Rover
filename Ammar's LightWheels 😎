@@ -63,7 +63,7 @@ float Roll = 0, Pitch = 0, Yaw = 0;
 float Ax = 0, Ay = 0, Az = 0;
 float Gx = 0, Gy = 0, Gz = 0;
 
-char filename[] = "LOG00.CSV";
+char filename[] = "LightWheelsLOG00.CSV";
 
 unsigned long previousMillis = 0;
 const long interval = 10; // 100 Hz Logging
@@ -117,7 +117,6 @@ void forward(float duty) {
 
   PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
   digitalWrite(in1_E, HIGH); digitalWrite(in2_E, LOW); digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
-  Serial.println("Driving Forwards");
 }
 
 void reverse(float duty) {
@@ -130,7 +129,6 @@ void reverse(float duty) {
 
   PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
   digitalWrite(in1_E, LOW); digitalWrite(in2_E, HIGH); digitalWrite(in1_F, LOW); digitalWrite(in2_F, HIGH);
-  Serial.println("Driving in Reverse");
 }
 
 void turnLeft(float duty) {
@@ -156,7 +154,6 @@ void turnLeft(float duty) {
   PWMC_SetDutyCycle(PWM, chF, trueDuty);
   digitalWrite(in1_F, LOW); digitalWrite(in2_F, HIGH);
 
-  Serial.println("Turning LEFT");
 }
 
 
@@ -183,7 +180,6 @@ void turnRight(float duty) {
   PWMC_SetDutyCycle(PWM, chF, trueDuty);
   digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
 
-  Serial.println("Turning RIGHT");
 }
 
 
@@ -198,7 +194,6 @@ void stop() {
 
   PWMC_SetDutyCycle(PWM, chE, trueDuty); PWMC_SetDutyCycle(PWM, chF, trueDuty);
   digitalWrite(in1_E, HIGH); digitalWrite(in2_E, LOW); digitalWrite(in1_F, HIGH); digitalWrite(in2_F, LOW);
-  Serial.println("Stopping");
 }
 
 // --- SETUP ---
