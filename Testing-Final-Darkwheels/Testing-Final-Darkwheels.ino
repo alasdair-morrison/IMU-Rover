@@ -58,7 +58,7 @@ float Roll = 0, Pitch = 0, Yaw = 0;
 float Ax = 0, Ay = 0, Az = 0;
 float Gx = 0, Gy = 0, Gz = 0;
 
-char filename[] = "LOG00.CSV";
+char filename[] = "DarkwheelsLOG00.CSV";
 
 unsigned long previousMillis = 0;
 const long interval = 10; // 100 Hz Logging
