@@ -289,7 +289,7 @@ void setup(){
     Serial1.write(Rasengan, 5);
 
     // --- AUTO-INCREMENT FILE NAME LOGIC ---
-    char fileName[15] = "LOG00.CSV";
+    char fileName[15] = "LWLOG00.CSV";
     for (uint8_t i = 0; i < 100; i++) {
         fileName[3] = i / 10 + '0';
         fileName[4] = i % 10 + '0';
@@ -316,17 +316,17 @@ void setup(){
 void loop(){     // LIKE WHILE TRUE INSIDE MAIN
     unsigned long currentMillis = millis();     //Time tracking
 
-    if (currentMillis < 100000) {        // Forward for 10 seconds    
-        forward(0.5);    
-  //  } 
-  //  else if (currentMillis < 20000) {   // Turn left for next 10 seconds
-  //      turnLeft(0.5);  
-  //  }
-  //  else if (currentMillis < 30000) {   // Reverse for next 10 seconds
-  //      reverse(0.5);    
-  //  }     
- //   else {          
-  //      stop();                        // Stop forever after 30 seconds
+    if (currentMillis < 5000) {        // Forward for 10 seconds    
+        forward(0.7);    
+     } 
+    else if (currentMillis < 10000) {   // Turn left for next 10 seconds
+        turnLeft(0.8);  
+    }
+    //else if (currentMillis < 30000) {   // Reverse for next 10 seconds
+     //   reverse(0.5);    
+    //}     
+    else {          
+    stop();                        // Stop forever after 30 seconds
     }
 
     // Always listen for IMU data in the background
